@@ -138,10 +138,20 @@
       { month: "short", day: "numeric", year: "numeric" });
   }
 
+  function parseTs(iso) {
+    // Postgres timestamptz::text looks like "2026-07-13 10:00:00+00" —
+    // V8 needs "T" and a full "+00:00" offset or it returns Invalid Date
+    // (which silently killed the plans banner + message times).
+    if (!iso) return null;
+    var s = String(iso).replace(" ", "T")
+      .replace(/([+-]\d{2})$/, "$1:00");
+    var d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
   function fmtDateTime(iso) {
-    if (!iso) return "";
-    var d = new Date(String(iso).replace(" ", "T"));
-    if (isNaN(d)) return "";
+    var d = parseTs(iso);
+    if (!d) return "";
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
       ", " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
@@ -174,6 +184,7 @@
     rpc("sub_get_project", { p_token: token }).then(function (data) {
       project = data || {};
       renderHeader();
+      renderBidDivisions();
       $("view-loading").hidden = true;
       $("view-app").hidden = false;
       loadPlans();
@@ -250,7 +261,11 @@
       plans.forEach(function (p) {
         var row = document.createElement("div");
         row.className = "plan-row";
-        var meta = [fmtSize(p.size_bytes), fmtDate(p.uploaded_at)]
+        // v1.16.2 — drawing revision + plan date lead the meta line
+        // ("Rev 2 — Jul 1, 2026"). Older rows without a rev just skip it.
+        var rev = (p.rev == null) ? "" :
+          ("Rev " + p.rev + (p.plan_date ? " — " + fmtDate(p.plan_date) : ""));
+        var meta = [rev, fmtSize(p.size_bytes), fmtDate(p.uploaded_at)]
           .filter(Boolean).join(" · ");
         row.innerHTML =
           '<div class="plan-info">' +
@@ -279,11 +294,12 @@
   function maybeShowPlansBanner() {
     // Yellow "plans changed" banner. plans_updated_at is set by the GC app
     // starting at v1.16.2 — until then this stays dormant.
-    var updated = project && project.plans_updated_at;
-    var last = storeGet("lastVisit");
+    var updated = parseTs(project && project.plans_updated_at);
+    var last = parseTs(storeGet("lastVisit"));
     if (!updated || !last) return;
-    if (new Date(String(updated).replace(" ", "T")) > new Date(last)) {
-      $("plans-updated-date").textContent = fmtDate(updated);
+    if (updated > last) {
+      $("plans-updated-date").textContent =
+        fmtDate(project.plans_updated_at);
       $("plans-banner").hidden = false;
     }
   }
@@ -385,6 +401,62 @@
 
   // ------------------------------------------------------------ submit bid
 
+  // v1.16.3 — the invited trades become checkboxes, each with its own
+  // amount box. These feed p_divisions/p_amounts on sub_submit_bid, which
+  // the contractor's app turns into pre-answered File Bid sort questions.
+  // No invited trades on the token => the plain single amount field stays.
+  function renderBidDivisions() {
+    var codes = (project && project.divisions) || [];
+    if (!codes.length) return;
+    $("bid-amount-single").hidden = true;
+    $("bid-divisions-field").hidden = false;
+    var list = $("bid-divisions");
+    list.innerHTML = "";
+    codes.forEach(function (code) {
+      var row = document.createElement("div");
+      row.className = "division-row";
+      var safe = esc(String(code));
+      row.innerHTML =
+        '<label class="division-check">' +
+        '<input type="checkbox" checked data-code="' + safe + '"> ' +
+        esc(divisionChip(code)) + "</label>" +
+        '<input type="text" inputmode="decimal" class="division-amount" ' +
+        'placeholder="Amount (optional)" maxlength="100" data-code="' +
+        safe + '">';
+      var box = row.querySelector("input[type=checkbox]");
+      var amount = row.querySelector(".division-amount");
+      box.addEventListener("change", function () {
+        amount.disabled = !box.checked;
+        row.classList.toggle("off", !box.checked);
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function collectBidAnswers() {
+    // -> {divisions: [...], amounts: {...}, amount_text: "..."} for the RPC.
+    var out = { divisions: [], amounts: {}, amount_text: "" };
+    var rows = document.querySelectorAll("#bid-divisions .division-row");
+    if (!rows.length) {
+      out.amount_text = $("bid-amount").value.trim();
+      return out;
+    }
+    rows.forEach(function (row) {
+      var box = row.querySelector("input[type=checkbox]");
+      if (!box || !box.checked) return;
+      var code = box.getAttribute("data-code");
+      out.divisions.push(code);
+      var amount = row.querySelector(".division-amount").value.trim();
+      if (amount) out.amounts[code] = amount;
+    });
+    // amount_text mirrors the single amount when exactly one trade is
+    // checked, so anything reading the old column still sees the number.
+    if (out.divisions.length === 1) {
+      out.amount_text = out.amounts[out.divisions[0]] || "";
+    }
+    return out;
+  }
+
   function setFile(file) {
     $("file-error").hidden = true;
     var isPdf = file && (/\.pdf$/i.test(file.name) ||
@@ -454,12 +526,15 @@
       return uploadFile(grant.bucket || "bids", grant.path, chosenFile);
     }).then(function () {
       $("sending-status").textContent = "Recording your bid…";
+      var answers = collectBidAnswers();
       return rpc("sub_submit_bid", {
         p_token: token,
         p_storage_path: storage.path,
         p_filename: chosenFile.name,
-        p_amount_text: $("bid-amount").value.trim(),
-        p_note: $("bid-note").value.trim()
+        p_amount_text: answers.amount_text,
+        p_note: $("bid-note").value.trim(),
+        p_divisions: answers.divisions,
+        p_amounts: answers.amounts
       });
     }).then(function () {
       showBidView("bid-success-view");

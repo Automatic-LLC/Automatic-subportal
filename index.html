@@ -99,11 +99,22 @@
           <p id="file-chosen" class="file-chosen" hidden></p>
           <p id="file-error" class="field-error" hidden></p>
 
-          <label class="field">
-            <span>Bid amount <em>(optional)</em></span>
-            <input id="bid-amount" type="text" inputmode="decimal"
-                   placeholder="e.g. 148,500" maxlength="100">
-          </label>
+          <!-- v1.16.3 — the sub answers the sort questions here: which
+               trades this bid covers (pre-checked from the invitation) and
+               an amount per trade. The desktop app pre-fills its File Bid
+               questions from these, so the contractor files with no typing. -->
+          <div class="field" id="bid-divisions-field" hidden>
+            <span>This bid covers <em>(from your invitation — adjust if
+              needed)</em></span>
+            <div id="bid-divisions" class="division-list"></div>
+          </div>
+          <div id="bid-amounts">
+            <label class="field" id="bid-amount-single">
+              <span>Bid amount <em>(optional)</em></span>
+              <input id="bid-amount" type="text" inputmode="decimal"
+                     placeholder="e.g. 148,500" maxlength="100">
+            </label>
+          </div>
           <label class="field">
             <span>Note to the contractor <em>(optional)</em></span>
             <textarea id="bid-note" rows="3" maxlength="2000"></textarea>
