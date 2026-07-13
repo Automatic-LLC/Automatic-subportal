@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<!-- Foundation sub portal (v1.15) — the free front door for invited subs.
+     Plain HTML/CSS/JS, no build step, no libraries. The invite token rides
+     the URL hash (never sent to any web server); every request goes to the
+     credential-checked RPCs in Cloud/schema.sql. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Foundation — Bid Portal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============================== loading =============================== -->
+  <div id="view-loading" class="fullpage">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Loading your invitation…</p>
+  </div>
+
+  <!-- ============================ bad / dead link ========================== -->
+  <div id="view-error" class="fullpage" hidden>
+    <div class="error-card">
+      <h1>This link isn't active</h1>
+      <p id="error-detail">
+        The invitation may have been removed, the project may have closed,
+        or the link may not have copied completely.
+      </p>
+      <p>To reach the contractor who invited you, simply reply to the
+         invitation email this link arrived in.</p>
+    </div>
+  </div>
+
+  <!-- ================================ app ================================= -->
+  <div id="view-app" hidden>
+    <header class="site-header">
+      <div class="header-inner">
+        <p class="gc-line">Invited by <span id="gc-name"></span></p>
+        <h1 id="project-name"></h1>
+        <p class="meta-line">
+          <span id="due-date" class="due"></span>
+          <span id="divisions" class="chips"></span>
+        </p>
+        <p id="welcome-text" class="welcome" hidden></p>
+      </div>
+    </header>
+
+    <nav class="tabbar" role="tablist">
+      <button id="tab-plans" class="tab active" role="tab" aria-selected="true">Plans</button>
+      <button id="tab-messages" class="tab" role="tab" aria-selected="false">Messages</button>
+      <button id="tab-bid" class="tab" role="tab" aria-selected="false">Submit Bid</button>
+    </nav>
+
+    <main class="content">
+
+      <!-- ------------------------------ Plans ---------------------------- -->
+      <section id="pane-plans" class="pane" role="tabpanel">
+        <div id="plans-banner" class="banner-warn" hidden>
+          Plans were updated <span id="plans-updated-date"></span> — please
+          review before bidding.
+        </div>
+        <div id="plans-list"></div>
+        <p id="plans-empty" class="empty" hidden>
+          No plans have been shared yet. Check back soon, or message the
+          contractor on the Messages tab.
+        </p>
+      </section>
+
+      <!-- ---------------------------- Messages --------------------------- -->
+      <section id="pane-messages" class="pane" role="tabpanel" hidden>
+        <div id="msg-thread" class="thread"></div>
+        <p id="msg-empty" class="empty" hidden>
+          No messages yet. Say hello — the contractor sees these in
+          the project's chat.
+        </p>
+        <form id="msg-form" class="composer">
+          <input id="msg-input" type="text" autocomplete="off"
+                 placeholder="Type a message…" maxlength="4000">
+          <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+      </section>
+
+      <!-- --------------------------- Submit Bid -------------------------- -->
+      <section id="pane-bid" class="pane" role="tabpanel" hidden>
+
+        <div id="bid-form-view">
+          <div id="declined-note" class="banner-warn" hidden>
+            You marked this project as "not bidding". Changed your mind?
+            You can still submit a bid below.
+          </div>
+
+          <div id="dropzone" class="dropzone" tabindex="0">
+            <p class="dz-big">Drop your bid PDF here</p>
+            <p class="dz-or">or</p>
+            <button type="button" id="choose-file" class="btn btn-primary">Choose file</button>
+            <input id="file-input" type="file" accept=".pdf,application/pdf" hidden>
+          </div>
+          <p id="file-chosen" class="file-chosen" hidden></p>
+          <p id="file-error" class="field-error" hidden></p>
+
+          <label class="field">
+            <span>Bid amount <em>(optional)</em></span>
+            <input id="bid-amount" type="text" inputmode="decimal"
+                   placeholder="e.g. 148,500" maxlength="100">
+          </label>
+          <label class="field">
+            <span>Note to the contractor <em>(optional)</em></span>
+            <textarea id="bid-note" rows="3" maxlength="2000"></textarea>
+          </label>
+
+          <button id="submit-bid" class="btn btn-primary btn-big" disabled>Submit Bid</button>
+          <p id="submit-error" class="field-error" hidden></p>
+
+          <p class="decline-line">
+            <a href="#" id="decline-link">Not bidding this one</a>
+          </p>
+          <form id="decline-form" hidden>
+            <label class="field">
+              <span>Reason <em>(optional)</em></span>
+              <input id="decline-reason" type="text" maxlength="1000"
+                     placeholder="e.g. Booked solid through fall">
+            </label>
+            <button type="submit" class="btn btn-outline">Confirm — not bidding</button>
+            <button type="button" id="decline-cancel" class="btn btn-plain">Cancel</button>
+          </form>
+        </div>
+
+        <div id="bid-sending-view" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <p id="sending-status">Sending your bid…</p>
+        </div>
+
+        <div id="bid-success-view" class="success-card" hidden>
+          <div class="success-mark" aria-hidden="true">✓</div>
+          <h2>Bid sent to <span class="success-gc"></span></h2>
+          <p>You can resubmit any time before the due date — the newest
+             bid counts.</p>
+          <button id="submit-another" class="btn btn-outline">Submit a revised bid</button>
+        </div>
+
+        <div id="declined-view" class="success-card" hidden>
+          <h2>Thanks for letting them know</h2>
+          <p>We've told <span class="success-gc"></span> you're not bidding
+             this project. If anything changes, you can still submit a bid
+             here any time.</p>
+          <button id="declined-bid-anyway" class="btn btn-outline">Submit a bid anyway</button>
+        </div>
+
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Powered by <strong>Foundation</strong> —
+         <a href="#" id="get-app-link">get the free app</a></p>
+    </footer>
+  </div>
+
+  <!-- name popup (first message send) -->
+  <div id="name-modal" class="modal-backdrop" hidden>
+    <form id="name-form" class="modal">
+      <h2>Your name</h2>
+      <p>Shown next to your messages so the contractor knows who's writing.</p>
+      <input id="name-input" type="text" maxlength="200" autocomplete="name"
+             placeholder="e.g. Sam at Acme Drywall">
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
