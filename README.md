@@ -5,6 +5,11 @@ preconstruction / bid-management desktop app). Invited subcontractors open this
 page from the link in their invitation email to view plans, message the general
 contractor, and submit or decline bids.
 
+Since v1.21 the repo also carries the **Owner Console** (`owner.html`) — the
+app owner's private support page. Same hosting, same security model: the page
+source is public but every request needs the owner secret, which lives only in
+the backend's `owner_config` row and the owner's password manager.
+
 This repo is **public on purpose** so it can be served by GitHub Pages. It is a
 deliberately standalone mirror of the `docs/subportal/` folder in the private
 `Automatic-LLC/Foundation` repo — kept separate so the main app source stays
@@ -20,6 +25,7 @@ Plain HTML/CSS/JS — **no build step, no libraries, no framework.**
 | `styles.css` | All styling. |
 | `app.js` | All behavior. Reads the invite token from the URL hash and talks only to the token-scoped RPCs in the backend. |
 | `config.js` | Backend connection (Supabase URL + **publishable** key). |
+| `owner.html` / `owner.css` / `owner.js` | Owner Console (v1.21) — companies list, paid flips, owner notes, derived activity timeline, test-company delete. Talks only to the `owner_*` RPCs; inert without the owner secret. |
 
 ## Security model
 
@@ -29,6 +35,11 @@ Plain HTML/CSS/JS — **no build step, no libraries, no framework.**
   repo). **Never** put the `service_role`/secret key here or anywhere in this repo.
 - The invite token rides the URL **hash** (`#...`), so it is never sent to any
   web server — only handed to the backend RPCs by `app.js`.
+- The owner secret is **never in a URL** — it is typed into `owner.html` and
+  kept in the browser's session storage (or local storage when "remember on
+  this device" is checked). Every `owner_*` RPC validates it server-side;
+  wrong or absent secret = `unauthorized`, so hosting the page publicly
+  exposes nothing.
 
 ## Keeping in sync (important)
 
