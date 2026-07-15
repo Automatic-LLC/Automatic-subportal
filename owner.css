@@ -139,7 +139,92 @@
 .tl-detail { margin: 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 .tl-when { margin: 0; font-size: 12px; color: var(--muted); opacity: 0.8; }
 
+/* ---------------------------- diagnostics -------------------------------- */
+
+.diag-updated { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+
+.diag-group {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.diag-group > summary {
+  cursor: pointer;
+  padding: 11px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  list-style: none;
+}
+.diag-group > summary::-webkit-details-marker { display: none; }
+.diag-group > summary::before { content: "▸ "; color: var(--muted); }
+.diag-group[open] > summary::before { content: "▾ "; }
+.diag-body { padding: 0 14px 12px; }
+
+.kv { width: 100%; border-collapse: collapse; font-size: 13px; }
+.kv td { padding: 4px 8px; vertical-align: top; border-top: 1px solid var(--border); }
+.kv td:first-child { color: var(--muted); white-space: nowrap; width: 40%; }
+.kv td.mono, .kv td .mono { font-family: Consolas, Menlo, monospace; }
+
+.users-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.users-tbl th, .users-tbl td {
+  text-align: left; padding: 5px 8px; border-top: 1px solid var(--border);
+}
+.users-tbl th { color: var(--muted); font-weight: 600; }
+.role-pill {
+  background: var(--blue-chip-bg); color: var(--blue);
+  border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 600;
+}
+.role-pill.admin { background: var(--amber-bg); color: var(--amber); }
+.u-off { opacity: 0.5; }
+
+.err-list { margin: 0; }
+.err-item {
+  background: var(--red-bg);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #7a2a17;
+}
+.diag-chip {
+  display: inline-block;
+  background: var(--blue-chip-bg);
+  color: var(--blue);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* the version chip on list rows sits before the badge */
+.ver-chip {
+  background: #eef1f4; color: var(--muted);
+  border-radius: 999px; padding: 3px 10px;
+  font-size: 12px; font-weight: 600; flex-shrink: 0;
+}
+
 /* -------------------------------- modals --------------------------------- */
+
+.cred-line { margin: 10px 0 4px; font-size: 13px; color: var(--muted); }
+.cred {
+  display: block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-top: 3px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+.modal .field { margin-bottom: 10px; }
+.modal .field span { font-weight: 600; font-size: 14px; }
 
 .modal textarea, .modal input[type="text"] {
   width: 100%;

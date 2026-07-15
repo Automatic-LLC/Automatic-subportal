@@ -56,6 +56,7 @@
         <div class="listbar">
           <input id="search" type="search" placeholder="Search companies…"
                  autocomplete="off">
+          <button id="add-company" class="btn btn-primary" type="button">+ Company</button>
           <button id="refresh" class="btn btn-outline" type="button">Refresh</button>
         </div>
         <div id="company-list"></div>
@@ -98,6 +99,13 @@
           This company hasn't shared any projects to the cloud yet.
         </p>
 
+        <h3 class="section-title">Settings &amp; diagnostics</h3>
+        <p id="d-diag-empty" class="empty" hidden>
+          No diagnostics uploaded yet. Snapshots arrive once the company runs a
+          v1.21+ build with cloud on (pushed on their next daily sync).
+        </p>
+        <div id="d-diag"></div>
+
         <h3 class="section-title">Activity</h3>
         <div id="d-activity" class="timeline"></div>
         <p id="d-activity-empty" class="empty" hidden>No activity recorded yet.</p>
@@ -135,6 +143,41 @@
       <button type="button" id="delete-cancel" class="btn btn-plain">Cancel</button>
       <p id="delete-error" class="field-error" hidden></p>
     </form>
+  </div>
+
+  <!-- create company -->
+  <div id="create-modal" class="modal-backdrop" hidden>
+    <form id="create-form" class="modal">
+      <h2>Create a company</h2>
+      <p>Pre-provisions a company on the backend and mints its credential.
+         Give the customer the Company ID + secret to paste into their synced
+         <span class="mono">!System/cloud_identity.json</span> — their app then
+         signs in as this company.</p>
+      <label class="field"><span>Company ID</span>
+        <input id="create-fnd" type="text" autocomplete="off"
+               placeholder="e.g. FND-1A2B-3C4D" maxlength="100"></label>
+      <label class="field"><span>Company name <em>(optional)</em></span>
+        <input id="create-name" type="text" autocomplete="off" maxlength="200"></label>
+      <label class="remember-line">
+        <input id="create-paid" type="checkbox" checked> Start paid (unlocked)
+      </label>
+      <button type="submit" class="btn btn-primary">Create</button>
+      <button type="button" id="create-cancel" class="btn btn-plain">Cancel</button>
+      <p id="create-error" class="field-error" hidden></p>
+    </form>
+  </div>
+
+  <!-- created — show the secret once -->
+  <div id="secret-modal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <h2>Company created</h2>
+      <p>Hand these to the customer <strong>now</strong> — the secret is shown
+         only this once and is never retrievable again.</p>
+      <p class="cred-line">Company ID<br><span id="secret-fnd" class="mono cred"></span></p>
+      <p class="cred-line">Secret<br><span id="secret-val" class="mono cred"></span></p>
+      <button type="button" id="secret-copy" class="btn btn-outline">Copy both</button>
+      <button type="button" id="secret-done" class="btn btn-primary">Done</button>
+    </div>
   </div>
 
   <script src="config.js"></script>
