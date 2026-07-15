@@ -221,6 +221,8 @@
         (c.owner_note
           ? '<p class="company-note">📝 ' + esc(c.owner_note) + "</p>" : "") +
         "</div>" +
+        (c.app_version
+          ? '<span class="ver-chip">v' + esc(c.app_version) + "</span>" : "") +
         (days != null && days > 30
           ? '<span class="badge stale">quiet</span>' : "") +
         badge;
@@ -278,6 +280,13 @@
     ownerRpc("owner_company_activity", { p_company_id: c.id, p_limit: 200 })
       .then(function (events) {
         renderActivity(Array.isArray(events) ? events : []);
+      }).catch(handleDetailError);
+
+    $("d-diag").innerHTML = "";
+    $("d-diag-empty").hidden = true;
+    ownerRpc("owner_company_diagnostics", { p_company_id: c.id })
+      .then(function (data) {
+        renderDiagnostics(data || {});
       }).catch(handleDetailError);
   }
 
@@ -346,6 +355,108 @@
         '<p class="tl-when">' + esc(fmtDateTime(ev.at)) + "</p>";
       box.appendChild(item);
     });
+  }
+
+  // ---------------------------------------------------------- diagnostics
+
+  var ROLE_NAMES = { Lvl1: "Lvl 1", Lvl2: "Lvl 2", Lvl3: "Lvl 3", Admin: "Admin" };
+
+  function kvTable(obj, order) {
+    var keys = order || Object.keys(obj || {});
+    var rows = keys.filter(function (k) {
+      return obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== "";
+    }).map(function (k) {
+      var v = obj[k];
+      if (typeof v === "boolean") v = v ? "yes" : "no";
+      else if (Array.isArray(v)) v = v.join(", ");
+      else if (typeof v === "object") v = JSON.stringify(v);
+      return "<tr><td>" + esc(k.replace(/_/g, " ")) + "</td>" +
+        '<td class="mono">' + esc(String(v)) + "</td></tr>";
+    }).join("");
+    return rows ? '<table class="kv">' + rows + "</table>"
+                : '<p class="empty">—</p>';
+  }
+
+  function group(title, chip, innerHtml, open) {
+    return '<details class="diag-group"' + (open ? " open" : "") + ">" +
+      "<summary>" + esc(title) +
+      (chip ? '<span class="diag-chip">' + esc(chip) + "</span>" : "") +
+      '</summary><div class="diag-body">' + innerHtml + "</div></details>";
+  }
+
+  function renderUsers(u) {
+    if (!u || u._error) return '<p class="empty">unavailable</p>';
+    var head = "<p><strong>" + esc(String(u.count || 0)) + "</strong> active" +
+      (u.archived ? " · " + esc(String(u.archived)) + " archived" : "") + "</p>";
+    var rows = (u.roster || []).map(function (m) {
+      var role = m.role || "?";
+      var pill = '<span class="role-pill' +
+        (role === "Admin" ? " admin" : "") + '">' +
+        esc(ROLE_NAMES[role] || role) + "</span>";
+      var name = ((m.first_name || "") + " " + (m.last_name || "")).trim()
+        || m.email || "(unnamed)";
+      return '<tr class="' + (m.is_active === false ? "u-off" : "") + '">' +
+        "<td>" + esc(name) + "</td>" +
+        "<td>" + esc(m.email || "") + "</td>" +
+        "<td>" + pill + "</td>" +
+        "<td>" + esc(m.company_title || "") + "</td>" +
+        "<td>" + (m.all_projects ? "all" : "scoped") + "</td></tr>";
+    }).join("");
+    return head + '<table class="users-tbl"><tr><th>Name</th><th>Email</th>' +
+      "<th>Role</th><th>Title</th><th>Projects</th></tr>" + rows + "</table>";
+  }
+
+  function renderErrors(errs) {
+    if (!Array.isArray(errs) || !errs.length) {
+      return '<p class="empty">No recent errors logged. 🎉</p>';
+    }
+    return '<div class="err-list">' + errs.slice().reverse().map(function (e) {
+      return '<div class="err-item">' + esc(e) + "</div>";
+    }).join("") + "</div>";
+  }
+
+  function renderDiagnostics(data) {
+    var snap = data && data.snapshot;
+    var box = $("d-diag");
+    if (!snap) {
+      box.innerHTML = "";
+      $("d-diag-empty").hidden = false;
+      return;
+    }
+    $("d-diag-empty").hidden = true;
+    var parts = [];
+    var sub = snap.contractor_type ? (" · " + snap.contractor_type) : "";
+    parts.push('<p class="diag-updated">Snapshot from <span class="mono">' +
+      esc(data.machine || snap.machine || "?") + "</span> · " +
+      esc(fmtDateTime(data.updated_at)) +
+      (data.app_version ? " · app v" + esc(data.app_version) + sub : "") +
+      "</p>");
+
+    var errCount = Array.isArray(snap.recent_errors) ? snap.recent_errors.length : 0;
+    parts.push(group("Recent errors", errCount ? String(errCount) : "",
+      renderErrors(snap.recent_errors), errCount > 0));
+    parts.push(group("Users",
+      snap.users ? String(snap.users.count || 0) : "",
+      renderUsers(snap.users), false));
+    parts.push(group("Company profile", "", kvTable(snap.company_profile), false));
+    parts.push(group("Folder names", "",
+      snap.folder_names && snap.folder_names.ordered
+        ? kvTable({ order: snap.folder_names.ordered,
+                    custom: snap.folder_names.custom }) : '<p class="empty">—</p>',
+      false));
+    parts.push(group("Building types",
+      Array.isArray(snap.building_types) ? String(snap.building_types.length) : "",
+      Array.isArray(snap.building_types) && snap.building_types.length
+        ? '<p class="mono" style="font-size:13px">' +
+          esc(snap.building_types.join(", ")) + "</p>"
+        : '<p class="empty">—</p>', false));
+    parts.push(group("ITB settings", "", kvTable(snap.itb_settings), false));
+    parts.push(group("File Document", "", kvTable(snap.file_document), false));
+    parts.push(group("Project defaults", "", kvTable(snap.project_defaults), false));
+    parts.push(group("Cloud / storage / activity", "",
+      kvTable(Object.assign({}, snap.cloud_settings, snap.storage,
+                            snap.activity_log)), false));
+    box.innerHTML = parts.join("");
   }
 
   function backToList(reload) {
@@ -455,6 +566,63 @@
           : "Delete failed — check your connection and try again.";
       $("delete-error").hidden = false;
     });
+  });
+
+  // ------------------------------------------------------- create company
+
+  var lastCreated = null;
+
+  $("add-company").addEventListener("click", function () {
+    $("create-fnd").value = "";
+    $("create-name").value = "";
+    $("create-paid").checked = true;
+    $("create-error").hidden = true;
+    $("create-modal").hidden = false;
+    $("create-fnd").focus();
+  });
+  $("create-cancel").addEventListener("click", function () {
+    $("create-modal").hidden = true;
+  });
+  $("create-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var fnd = $("create-fnd").value.trim();
+    if (!fnd) {
+      $("create-error").textContent = "A Company ID is required.";
+      $("create-error").hidden = false;
+      return;
+    }
+    ownerRpc("owner_create_company", {
+      p_fnd_company_id: fnd,
+      p_name: $("create-name").value.trim(),
+      p_paid: $("create-paid").checked
+    }).then(function (res) {
+      $("create-modal").hidden = true;
+      lastCreated = res || {};
+      $("secret-fnd").textContent = lastCreated.fnd_company_id || fnd;
+      $("secret-val").textContent = lastCreated.gc_secret || "";
+      $("secret-modal").hidden = false;
+      refreshList(false);
+    }).catch(function (e) {
+      if (e.unauthorized) { signOut(); return; }
+      $("create-error").textContent = e.rpcMessage === "company exists"
+        ? "That Company ID already exists."
+        : "Couldn't create the company — check your connection and try again.";
+      $("create-error").hidden = false;
+    });
+  });
+  $("secret-copy").addEventListener("click", function () {
+    if (!lastCreated) return;
+    var text = "Company ID: " + (lastCreated.fnd_company_id || "") +
+      "\nSecret: " + (lastCreated.gc_secret || "");
+    try {
+      navigator.clipboard.writeText(text);
+      $("secret-copy").textContent = "Copied ✓";
+      setTimeout(function () { $("secret-copy").textContent = "Copy both"; }, 1500);
+    } catch (e) { /* clipboard blocked — the values are on screen to copy by hand */ }
+  });
+  $("secret-done").addEventListener("click", function () {
+    $("secret-modal").hidden = true;
+    lastCreated = null;
   });
 
   // ----------------------------------------------------------------- boot
