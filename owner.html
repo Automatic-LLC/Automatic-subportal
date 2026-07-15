@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<!-- Foundation Owner Console (v1.21) — Aaron's private support page.
+     Plain HTML/CSS/JS, no build step, no libraries. The owner secret is
+     typed into the page (never in the URL) and every request goes to the
+     owner-credential-checked owner_* RPCs in Cloud/schema.sql. The page is
+     public but inert: without the secret every call returns unauthorized. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Foundation — Owner Console</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="owner.css">
+</head>
+<body>
+
+  <!-- ============================== sign in =============================== -->
+  <div id="view-login" class="fullpage" hidden>
+    <form id="login-form" class="error-card login-card">
+      <h1>Owner Console</h1>
+      <p>This page is for the Foundation owner. Enter the owner secret to
+         continue.</p>
+      <input id="login-secret" type="password" autocomplete="current-password"
+             placeholder="Owner secret" maxlength="200">
+      <label class="remember-line">
+        <input id="login-remember" type="checkbox">
+        Remember on this device
+      </label>
+      <button type="submit" class="btn btn-primary">Sign in</button>
+      <p id="login-error" class="field-error" hidden></p>
+    </form>
+  </div>
+
+  <!-- ============================== loading =============================== -->
+  <div id="view-loading" class="fullpage">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Loading…</p>
+  </div>
+
+  <!-- ================================ app ================================= -->
+  <div id="view-app" hidden>
+    <header class="site-header">
+      <div class="header-inner">
+        <p class="gc-line">Foundation — customer support
+          <a href="#" id="sign-out" class="signout">Sign out</a></p>
+        <h1>Owner Console</h1>
+        <p class="meta-line"><span id="stats" class="chips"></span></p>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- --------------------------- company list ------------------------- -->
+      <section id="pane-list">
+        <div class="listbar">
+          <input id="search" type="search" placeholder="Search companies…"
+                 autocomplete="off">
+          <button id="refresh" class="btn btn-outline" type="button">Refresh</button>
+        </div>
+        <div id="company-list"></div>
+        <p id="list-empty" class="empty" hidden>
+          No companies have registered yet. The first launch of Foundation
+          with cloud on creates a row here by itself.
+        </p>
+      </section>
+
+      <!-- -------------------------- company detail ------------------------ -->
+      <section id="pane-detail" hidden>
+        <p class="backline"><a href="#" id="back-link">&larr; All companies</a></p>
+
+        <div class="detail-card">
+          <div class="detail-head">
+            <div>
+              <h2 id="d-name"></h2>
+              <p class="d-meta">
+                <span id="d-fnd" class="mono"></span> ·
+                registered <span id="d-created"></span> ·
+                last seen <span id="d-seen"></span>
+              </p>
+            </div>
+            <span id="d-paid" class="badge"></span>
+          </div>
+          <div class="detail-actions">
+            <button id="btn-paid" class="btn btn-outline" type="button"></button>
+            <button id="btn-note" class="btn btn-outline" type="button">Edit note</button>
+            <button id="btn-delete" class="btn btn-danger" type="button">Delete company…</button>
+          </div>
+          <p id="d-note" class="owner-note" hidden></p>
+          <p class="hint">Paid changes are picked up by their app on its next
+            daily license check (up to ~24&nbsp;h, plus a 30-day offline grace
+            window).</p>
+        </div>
+
+        <h3 class="section-title">Shared projects</h3>
+        <div id="d-projects"></div>
+        <p id="d-projects-empty" class="empty" hidden>
+          This company hasn't shared any projects to the cloud yet.
+        </p>
+
+        <h3 class="section-title">Activity</h3>
+        <div id="d-activity" class="timeline"></div>
+        <p id="d-activity-empty" class="empty" hidden>No activity recorded yet.</p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Foundation Owner Console — private. Chat message contents never
+         appear here; the timeline only shows that a message was sent.</p>
+    </footer>
+  </div>
+
+  <!-- note editor -->
+  <div id="note-modal" class="modal-backdrop" hidden>
+    <form id="note-form" class="modal">
+      <h2>Owner note</h2>
+      <p>Only you can see this — it never reaches the company.</p>
+      <textarea id="note-input" rows="4" maxlength="2000"></textarea>
+      <button type="submit" class="btn btn-primary">Save note</button>
+      <button type="button" id="note-cancel" class="btn btn-plain">Cancel</button>
+    </form>
+  </div>
+
+  <!-- delete confirm -->
+  <div id="delete-modal" class="modal-backdrop" hidden>
+    <form id="delete-form" class="modal">
+      <h2>Delete this company?</h2>
+      <p>Removes the company and all of its cloud data (projects, invites,
+         plan records, bids, chat). Their app re-registers fresh on next
+         launch. Built for cleaning up test registrations — type the Company
+         ID <strong id="delete-fnd" class="mono"></strong> to confirm.</p>
+      <input id="delete-confirm" type="text" autocomplete="off"
+             placeholder="Type the Company ID" maxlength="100">
+      <button type="submit" class="btn btn-danger" disabled>Delete permanently</button>
+      <button type="button" id="delete-cancel" class="btn btn-plain">Cancel</button>
+      <p id="delete-error" class="field-error" hidden></p>
+    </form>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="owner.js"></script>
+</body>
+</html>
