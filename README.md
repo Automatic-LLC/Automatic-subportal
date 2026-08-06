@@ -12,8 +12,7 @@ the backend's `owner_config` row and the owner's password manager.
 
 This repo is **public on purpose** so it can be served by GitHub Pages. It is a
 deliberately standalone mirror of the `docs/subportal/` folder in the private
-`Automatic-LLC/Foundation` repo (still named Foundation on GitHub until Aaron
-renames it) — kept separate so the main app source stays
+`Automatic-LLC/Automatic-App` repo — kept separate so the main app source stays
 private while only these four static files are exposed.
 
 ## What's here
