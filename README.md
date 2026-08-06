@@ -1,6 +1,6 @@
-# Foundation — Sub Bid Portal
+# Automatic — Sub Bid Portal
 
-The public, sub-facing web page for **Foundation** (the private construction
+The public, sub-facing web page for **Automatic** (the private construction
 preconstruction / bid-management desktop app). Invited subcontractors open this
 page from the link in their invitation email to view plans, message the general
 contractor, and submit or decline bids.
@@ -12,7 +12,7 @@ the backend's `owner_config` row and the owner's password manager.
 
 This repo is **public on purpose** so it can be served by GitHub Pages. It is a
 deliberately standalone mirror of the `docs/subportal/` folder in the private
-`Automatic-LLC/Foundation` repo — kept separate so the main app source stays
+`Automatic-LLC/Automatic-App` repo — kept separate so the main app source stays
 private while only these four static files are exposed.
 
 ## What's here
@@ -44,7 +44,7 @@ Plain HTML/CSS/JS — **no build step, no libraries, no framework.**
 ## Keeping in sync (important)
 
 `config.js` here **must match** `Config.py` (`CLOUD_URL` / `CLOUD_ANON_KEY`) in
-the main Foundation repo. If the Supabase project or key ever changes, update
+the main Automatic repo. If the Supabase project or key ever changes, update
 **both** places. The four files here should track the `docs/subportal/` copy in
 the main repo — treat the main repo as the source when editing behavior, then
 mirror the change here (that copy remains for local development/reference).
@@ -55,6 +55,6 @@ mirror the change here (that copy remains for local development/reference).
 2. **Build and deployment → Source:** *Deploy from a branch*.
 3. **Branch:** `main`, folder `/ (root)` → **Save**.
 4. After it builds, the live URL appears at the top of the same page. Put that
-   exact URL into `Config.SUBPORTAL_URL` in the main Foundation repo.
+   exact URL into `Config.SUBPORTAL_URL` in the main Automatic repo.
 
 Expected URL: `https://automatic-llc.github.io/Automatic-subportal/`

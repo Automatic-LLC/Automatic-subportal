@@ -1,4 +1,4 @@
-/* Foundation sub portal (v1.15) — all page behavior.
+/* Automatic sub portal (v1.15) — all page behavior.
  *
  * The invite token comes from the URL hash (#<token>) and is the sub's only
  * credential. Every call goes to the token-checked RPCs in Cloud/schema.sql:
@@ -74,9 +74,23 @@
 
   // localStorage is namespaced per token so two invites on one phone
   // don't share names/visit markers.
-  function storeKey(suffix) { return "fnd:" + token.slice(0, 12) + ":" + suffix; }
+  var STORE_PREFIX = "auto:";
+  var LEGACY_STORE_PREFIX = "fnd:";   // pre-rename; read once, then carried over
+  function storeKey(suffix, prefix) {
+    return (prefix || STORE_PREFIX) + token.slice(0, 12) + ":" + suffix;
+  }
   function storeGet(suffix) {
-    try { return localStorage.getItem(storeKey(suffix)); } catch (e) { return null; }
+    try {
+      var v = localStorage.getItem(storeKey(suffix));
+      if (v === null) {
+        // A sub who opened this page before the rename has their name and
+        // last-visit marker under the old prefix. Carry it over instead of
+        // making them retype their name and see every file as new again.
+        v = localStorage.getItem(storeKey(suffix, LEGACY_STORE_PREFIX));
+        if (v !== null) { localStorage.setItem(storeKey(suffix), v); }
+      }
+      return v;
+    } catch (e) { return null; }
   }
   function storeSet(suffix, value) {
     try { localStorage.setItem(storeKey(suffix), value); } catch (e) { /* private mode */ }
@@ -241,7 +255,7 @@
   function renderHeader() {
     $("gc-name").textContent = project.gc_name || "your contractor";
     $("project-name").textContent = project.project_name || "Project";
-    document.title = (project.project_name || "Bid Portal") + " — Foundation";
+    document.title = (project.project_name || "Bid Portal") + " — Automatic";
     $("due-date").textContent =
       project.due_date ? ("Bids due " + fmtDate(project.due_date)) : "";
     var chips = $("divisions");
