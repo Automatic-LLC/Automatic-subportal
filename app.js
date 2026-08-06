@@ -16,16 +16,53 @@
   var MAX_BID_BYTES = 25 * 1024 * 1024; // mirror of the `bids` bucket cap
 
   // Trade names for the header chips — mirrors Config.py CSI_DIVISIONS.
+  //
+  // v1.22.4 round 12: regenerated from Config so the two can't drift. It had
+  // gone stale — ten divisions missing (a sub invited to Div 40 saw a bare
+  // number) and two titles wrong against the published standard.
+  //
+  // **CSI ONLY.** A company on the NAHB set numbers its divisions 1-10 by
+  // build order, so looking those up in here would tell a sub bidding
+  // "5 Rough Structure" that they are bidding "5 Metals". Nothing in the
+  // invite payload says which set the GC uses, so until it does an ambiguous
+  // number must fall through to a bare "Div N" — a sub reading the WRONG
+  // trade name is worse off than one reading no trade name.
   var CSI_NAMES = {
-    1: "General Requirements", 2: "Existing Conditions", 3: "Concrete",
-    4: "Masonry", 5: "Metals", 6: "Wood, Plastics, and Composites",
-    7: "Thermal and Moisture Protection", 8: "Openings", 9: "Finishes",
-    10: "Specialties", 11: "Equipment", 12: "Furnishings",
-    13: "Special Construction", 14: "Conveying Systems",
-    21: "Fire Suppression", 22: "Plumbing", 23: "HVAC",
-    25: "Integrated Automation", 26: "Electrical", 27: "Communications",
-    28: "Electronic Safety and Security", 31: "Earthwork / Site Work",
-    32: "Exterior Improvements", 33: "Utilities", 34: "Transportation"
+    0: "Procurement and Contracting Requirements",
+    1: "General Requirements",
+    2: "Existing Conditions",
+    3: "Concrete",
+    4: "Masonry",
+    5: "Metals",
+    6: "Wood, Plastics, and Composites",
+    7: "Thermal and Moisture Protection",
+    8: "Openings",
+    9: "Finishes",
+    10: "Specialties",
+    11: "Equipment",
+    12: "Furnishings",
+    13: "Special Construction",
+    14: "Conveying Equipment",
+    21: "Fire Suppression",
+    22: "Plumbing",
+    23: "HVAC",
+    25: "Integrated Automation",
+    26: "Electrical",
+    27: "Communications",
+    28: "Electronic Safety and Security",
+    31: "Earthwork",
+    32: "Exterior Improvements",
+    33: "Utilities",
+    34: "Transportation",
+    35: "Waterway and Marine Construction",
+    40: "Process Interconnections",
+    41: "Material Processing and Handling Equipment",
+    42: "Process Heating, Cooling, and Drying Equipment",
+    43: "Process Gas and Liquid Handling and Storage",
+    44: "Pollution and Waste Control Equipment",
+    45: "Industry-Specific Manufacturing Equipment",
+    46: "Water and Wastewater Equipment",
+    48: "Electrical Power Generation"
   };
 
   var token = (location.hash || "").replace(/^#/, "").trim();
