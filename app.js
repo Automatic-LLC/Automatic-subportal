@@ -1,4 +1,4 @@
-/* Foundation sub portal (v1.15) — all page behavior.
+/* Automatic sub portal (v1.15) — all page behavior.
  *
  * The invite token comes from the URL hash (#<token>) and is the sub's only
  * credential. Every call goes to the token-checked RPCs in Cloud/schema.sql:
@@ -204,7 +204,7 @@
   function renderHeader() {
     $("gc-name").textContent = project.gc_name || "your contractor";
     $("project-name").textContent = project.project_name || "Project";
-    document.title = (project.project_name || "Bid Portal") + " — Foundation";
+    document.title = (project.project_name || "Bid Portal") + " — Automatic";
     $("due-date").textContent =
       project.due_date ? ("Bids due " + fmtDate(project.due_date)) : "";
     var chips = $("divisions");

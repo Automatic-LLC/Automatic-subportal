@@ -1,4 +1,4 @@
-/* Foundation Owner Console (v1.21) — all page behavior.
+/* Automatic Owner Console (v1.21) — all page behavior.
  *
  * The owner secret is typed into the page (never in the URL — URLs land in
  * history and screenshots) and kept in sessionStorage, or localStorage when
@@ -19,7 +19,7 @@
   var current = null;        // company object open in the detail pane
 
   var KIND_LABELS = {
-    registered:      "Registered with Foundation Cloud",
+    registered:      "Registered with Automatic Cloud",
     project_shared:  "Shared a project to the cloud",
     plans_updated:   "Marked plans updated",
     plan_uploaded:   "Uploaded a plan",
@@ -474,7 +474,7 @@
     if (!next && !confirm(
         "Lock " + (current.name || current.fnd_company_id) + "?\n\n" +
         "Their File Bid / Projects / Check Bids / PDF Tools show the " +
-        "Foundation Pro card after their next license check. Nothing is " +
+        "Automatic Pro card after their next license check. Nothing is " +
         "deleted — flipping back restores everything.")) {
       return;
     }
