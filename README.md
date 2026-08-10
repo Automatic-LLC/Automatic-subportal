@@ -10,10 +10,13 @@ app owner's private support page. Same hosting, same security model: the page
 source is public but every request needs the owner secret, which lives only in
 the backend's `owner_config` row and the owner's password manager.
 
-This repo is **public on purpose** so it can be served by GitHub Pages. It is a
-deliberately standalone mirror of the `docs/subportal/` folder in the private
-`Automatic-LLC/Automatic-App` repo — kept separate so the main app source stays
-private while only these four static files are exposed.
+This repo is **public on purpose** so it can be served by GitHub Pages. It was
+split out of the private `Automatic-LLC/Automatic-App` repo so the main app
+source stays private while only these static files are exposed.
+
+**This repo is now the only copy.** It began as a mirror of a `docs/subportal/`
+folder in the app repo; that folder has since been deleted, so edit the web
+files here — there is no other copy to keep in step.
 
 ## What's here
 
@@ -45,9 +48,12 @@ Plain HTML/CSS/JS — **no build step, no libraries, no framework.**
 
 `config.js` here **must match** `Config.py` (`CLOUD_URL` / `CLOUD_ANON_KEY`) in
 the main Automatic repo. If the Supabase project or key ever changes, update
-**both** places. The four files here should track the `docs/subportal/` copy in
-the main repo — treat the main repo as the source when editing behavior, then
-mirror the change here (that copy remains for local development/reference).
+**both** places.
+
+`app.js`'s `CSI_NAMES` table mirrors `Config.CSI_DIVISIONS` — the trade names a
+sub sees on their invite chips. Regenerate it from `Config.py` rather than
+hand-editing; it drifted once and stopped at Division 34, so a sub invited to
+bid a Division 40+ trade saw a bare number.
 
 ## Enabling GitHub Pages
 
