@@ -21,12 +21,12 @@
   // gone stale — ten divisions missing (a sub invited to Div 40 saw a bare
   // number) and two titles wrong against the published standard.
   //
-  // **CSI ONLY.** A company on the NAHB set numbers its divisions 1-10 by
-  // build order, so looking those up in here would tell a sub bidding
-  // "5 Rough Structure" that they are bidding "5 Metals". Nothing in the
-  // invite payload says which set the GC uses, so until it does an ambiguous
-  // number must fall through to a bare "Div N" — a sub reading the WRONG
-  // trade name is worse off than one reading no trade name.
+  // **CSI ONLY — and now only a FALLBACK.** A company on the NAHB set numbers
+  // its divisions 1-10 by build order, so resolving those through this table
+  // told a sub bidding "5 Rough Structure" that they were bidding "5 Metals".
+  // Fixed in v1.22.5: the invite carries `division_labels` (the GC's own trade
+  // names for its own codes) and `divisionChip` prefers them. This table is
+  // what an older invite, which has no labels, still falls back to.
   var CSI_NAMES = {
     0: "Procurement and Contracting Requirements",
     1: "General Requirements",
@@ -215,6 +215,21 @@
   }
 
   function divisionChip(code) {
+    // The GC's own label wins (v1.22.5). Only the contractor knows which
+    // category system they run — CSI, NAHB, or their own custom names — so the
+    // invite now carries the trade names it was sent with, and this page shows
+    // what the GC actually meant.
+    //
+    // This is the fix for a real defect: a contractor on the NAHB set invited
+    // a sub to bid "5 Rough Structure" and this function told them "5 Metals",
+    // because it resolved every number through the CSI table below. Wrong
+    // trade name, to the person about to price it.
+    //
+    // The CSI table stays as the fallback: invites sent before v1.22.5 carry
+    // no labels, and for the CSI companies that is the correct answer anyway.
+    var labels = (project && project.division_labels) || {};
+    var sent = labels[String(code)];
+    if (sent) return "Div " + code + " — " + sent;
     var name = CSI_NAMES[parseInt(code, 10)];
     return name ? ("Div " + code + " — " + name) : ("Div " + code);
   }
