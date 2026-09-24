@@ -487,7 +487,7 @@
         '<input type="checkbox" checked data-code="' + safe + '"> ' +
         esc(divisionChip(code)) + "</label>" +
         '<input type="text" inputmode="decimal" class="division-amount" ' +
-        'placeholder="Amount (optional)" maxlength="100" data-code="' +
+        'placeholder="Amount" maxlength="100" data-code="' +
         safe + '">';
       var box = row.querySelector("input[type=checkbox]");
       var amount = row.querySelector(".division-amount");
@@ -521,6 +521,29 @@
       out.amount_text = out.amounts[out.divisions[0]] || "";
     }
     return out;
+  }
+
+  // v1.22.5 — the contractor's app now files a portal bid straight into the
+  // project under the division(s) picked here, named with the amount typed
+  // here. So both are required: a trade, and a price for each trade ticked.
+  // Returns the message to show, or "" when the answers are complete.
+  function bidAnswersProblem(answers) {
+    var rows = document.querySelectorAll("#bid-divisions .division-row");
+    var hasDigit = function (t) { return /\d/.test(t || ""); };
+    if (!rows.length) {
+      return hasDigit(answers.amount_text) ? "" :
+        "Enter your bid amount.";
+    }
+    if (!answers.divisions.length) {
+      return "Tick at least one trade this bid covers.";
+    }
+    for (var i = 0; i < answers.divisions.length; i++) {
+      if (!hasDigit(answers.amounts[answers.divisions[i]])) {
+        return "Enter an amount for " +
+          divisionChip(answers.divisions[i]) + ".";
+      }
+    }
+    return "";
   }
 
   function setFile(file) {
@@ -580,6 +603,12 @@
   $("submit-bid").addEventListener("click", function () {
     if (!chosenFile) return;
     $("submit-error").hidden = true;
+    var problem = bidAnswersProblem(collectBidAnswers());
+    if (problem) {
+      $("submit-error").textContent = problem;
+      $("submit-error").hidden = false;
+      return;
+    }
     showBidView("bid-sending-view");
     $("sending-status").textContent = "Sending your bid…";
     var storage = null;
