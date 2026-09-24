@@ -254,6 +254,7 @@
       $("view-loading").hidden = true;
       $("view-app").hidden = false;
       loadPlans();
+      startPlansRefresh();
     }).catch(function (e) {
       if (e.unauthorized) {
         showError();
@@ -318,9 +319,24 @@
 
   // ---------------------------------------------------------------- plans
 
+  // v1.22.5 round 4 — the plans list must never go stale on an open page.
+  // Listing a plan is what grants the page 15 minutes to download it
+  // (sub_list_plans -> _fnd_mint_grant), and the GC can publish or pull a
+  // sheet at any time. The page used to list once at load, so after a quarter
+  // of an hour — or after the GC changed what is public — a click failed
+  // until the sub re-opened the email. Aaron: "we cant just have the refresh
+  // work, instead of sub having to." So: re-list when the page comes back
+  // into view, every few minutes while it is open, before opening anything
+  // from a list older than PLANS_STALE_MS, and once more if an open fails.
+  var PLANS_STALE_MS = 10 * 60 * 1000;
+  var PLANS_POLL_MS = 3 * 60 * 1000;
+  var plansLoadedAt = 0;
+  var plansTimer = null;
+
   function loadPlans() {
-    rpc("sub_list_plans", { p_token: token }).then(function (plans) {
+    return rpc("sub_list_plans", { p_token: token }).then(function (plans) {
       plans = Array.isArray(plans) ? plans : [];
+      plansLoadedAt = Date.now();
       var list = $("plans-list");
       list.innerHTML = "";
       $("plans-empty").hidden = plans.length > 0;
@@ -350,11 +366,36 @@
       });
       maybeShowPlansBanner();
       storeSet("lastVisit", new Date().toISOString());
+      return plans;
     }).catch(function () {
       $("plans-empty").textContent =
         "Couldn't load the plans list — check your connection and reload.";
       $("plans-empty").hidden = false;
+      return null;
     });
+  }
+
+  function startPlansRefresh() {
+    if (!plansTimer) plansTimer = setInterval(function () {
+      if (!document.hidden) loadPlans();
+    }, PLANS_POLL_MS);
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && plansLoadedAt &&
+        Date.now() - plansLoadedAt > 30 * 1000) {
+      loadPlans();
+    }
+  });
+
+  // The row as the portal lists it NOW — the same sheet may have a new path
+  // (a new Rev) since the list on screen was drawn.
+  function currentPlan(p, plans) {
+    var found = null;
+    (plans || []).forEach(function (q) {
+      if (!found && q.filename === p.filename) found = q;
+    });
+    return found;
   }
 
   function maybeShowPlansBanner() {
@@ -374,7 +415,24 @@
     var original = btn.textContent;
     btn.textContent = "…";
     btn.disabled = true;
-    fetchFile(p.bucket || "plans", p.path).then(function (blob) {
+    var gone = false;
+    var fresh = (Date.now() - plansLoadedAt < PLANS_STALE_MS)
+      ? Promise.resolve(p)
+      : loadPlans().then(function (plans) {
+          return plans ? currentPlan(p, plans) : p;
+        });
+    fresh.then(function (row) {
+      if (!row) { gone = true; throw new Error("gone"); }
+      return fetchFile(row.bucket || "plans", row.path).catch(function () {
+        // One quiet retry through a fresh list: the grant may have run out,
+        // or the GC may have replaced the sheet since this list was drawn.
+        return loadPlans().then(function (plans) {
+          var again = plans ? currentPlan(p, plans) : null;
+          if (!again) { gone = true; throw new Error("gone"); }
+          return fetchFile(again.bucket || "plans", again.path);
+        });
+      });
+    }).then(function (blob) {
       var url = URL.createObjectURL(
         new Blob([blob], { type: "application/pdf" }));
       if (download) {
@@ -398,7 +456,9 @@
       }
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
     }).catch(function () {
-      alert("Couldn't open that file — check your connection and try again.");
+      alert(gone
+        ? "That sheet is no longer shared — the plans list has been updated."
+        : "Couldn't open that file — check your connection and try again.");
     }).finally(function () {
       btn.textContent = original;
       btn.disabled = false;
@@ -471,6 +531,15 @@
   // amount box. These feed p_divisions/p_amounts on sub_submit_bid, which
   // the contractor's app turns into pre-answered File Bid sort questions.
   // No invited trades on the token => the plain single amount field stays.
+  // The bid date defaults to today in the SUB's own time zone (toISOString
+  // would be UTC, which is tomorrow for a US evening).
+  function todayIso() {
+    var d = new Date();
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  if ($("bid-date") && !$("bid-date").value) $("bid-date").value = todayIso();
+
   function renderBidDivisions() {
     var codes = (project && project.divisions) || [];
     if (!codes.length) return;
@@ -501,7 +570,8 @@
 
   function collectBidAnswers() {
     // -> {divisions: [...], amounts: {...}, amount_text: "..."} for the RPC.
-    var out = { divisions: [], amounts: {}, amount_text: "" };
+    var out = { divisions: [], amounts: {}, amount_text: "",
+                bid_date: ($("bid-date").value || "").trim() };
     var rows = document.querySelectorAll("#bid-divisions .division-row");
     if (!rows.length) {
       out.amount_text = $("bid-amount").value.trim();
@@ -530,6 +600,10 @@
   function bidAnswersProblem(answers) {
     var rows = document.querySelectorAll("#bid-divisions .division-row");
     var hasDigit = function (t) { return /\d/.test(t || ""); };
+    // v1.22.5 round 4 — the bid date is File Bid's fourth question.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(answers.bid_date || "")) {
+      return "Enter the date on your bid.";
+    }
     if (!rows.length) {
       return hasDigit(answers.amount_text) ? "" :
         "Enter your bid amount.";
@@ -629,7 +703,8 @@
         p_amount_text: answers.amount_text,
         p_note: $("bid-note").value.trim(),
         p_divisions: answers.divisions,
-        p_amounts: answers.amounts
+        p_amounts: answers.amounts,
+        p_bid_date: answers.bid_date
       });
     }).then(function () {
       showBidView("bid-success-view");
