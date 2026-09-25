@@ -250,6 +250,7 @@ html, body {
 
 .field { display: block; margin-bottom: 12px; }
 .field span { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.field-hint { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 .field em { font-weight: 400; color: var(--muted); font-style: normal; }
 .field input, .field textarea {
   width: 100%;

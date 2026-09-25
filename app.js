@@ -175,9 +175,19 @@
   // ------------------------------------------------------------ formatting
 
   function esc(s) {
+    // v1.22.5 round 5 — quotes too. textContent->innerHTML escapes < > &
+    // only, and a value placed inside an attribute (data-code="…") could
+    // otherwise close the attribute and add its own.
     var d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
-    return d.innerHTML;
+    return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // Trades read low to high (9, 23, 28) — a text sort put 28 before 9.
+  function byCode(a, b) {
+    var x = parseFloat(a), y = parseFloat(b);
+    if (isNaN(x) || isNaN(y)) return String(a).localeCompare(String(b));
+    return x - y || String(a).localeCompare(String(b));
   }
 
   function fmtDate(iso) {
@@ -276,7 +286,7 @@
       project.due_date ? ("Bids due " + fmtDate(project.due_date)) : "";
     var chips = $("divisions");
     chips.innerHTML = "";
-    (project.divisions || []).forEach(function (code) {
+    (project.divisions || []).slice().sort(byCode).forEach(function (code) {
       var span = document.createElement("span");
       span.className = "chip";
       span.textContent = divisionChip(code);
@@ -538,10 +548,112 @@
     var pad = function (n) { return (n < 10 ? "0" : "") + n; };
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
-  if ($("bid-date") && !$("bid-date").value) $("bid-date").value = todayIso();
+
+  // v1.22.5 round 5 — the amount box takes a NUMBER and nothing else.
+  // Aaron: *"only accept digits, no commas dollar sign or anything stright
+  // numbers 125000"*, with the commas added as you type and ".00" added when
+  // you leave the box unless you typed the "." yourself. The contractor's app
+  // names the filed bid from this number, and a free-text box let "25k" file
+  // as $25.00 and "25,000 - 30,000" as $2,500,030,000.00.
+  var MONEY_MAX_DIGITS = 12;
+
+  function moneyShape(raw) {
+    // Digits and ONE "." survive; at most 2 digits after it.
+    var s = String(raw || "").replace(/[^\d.]/g, "");
+    var dot = s.indexOf(".");
+    var whole = dot < 0 ? s : s.slice(0, dot);
+    var cents = dot < 0 ? null : s.slice(dot + 1).replace(/\./g, "").slice(0, 2);
+    whole = whole.replace(/^0+(?=\d)/, "").slice(0, MONEY_MAX_DIGITS);
+    var grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (cents === null) return grouped;
+    return (grouped || "0") + "." + cents;
+  }
+
+  function attachMoney(input) {
+    if (!input) return;
+    input.setAttribute("inputmode", "decimal");
+    // Anything typed or pasted that is not a plain number is refused whole,
+    // never stripped down to its digits: "25,000 - 30,000" must not become
+    // 2,500,030,000 and "25k" must not become 25. A leading "$" and spaces
+    // are the only things let go, so a pasted "$ 125,000" still works.
+    var plain = function (t) {
+      return /^[\d.,]*$/.test(String(t || "").trim().replace(/^\$\s*/, ""));
+    };
+    input.addEventListener("beforeinput", function (ev) {
+      if (ev.inputType === "insertText" && ev.data != null && !plain(ev.data)) {
+        ev.preventDefault();
+      }
+    });
+    input.addEventListener("paste", function (ev) {
+      var t = (ev.clipboardData || window.clipboardData);
+      t = t ? t.getData("text") : "";
+      if (!plain(t)) {
+        ev.preventDefault();
+        return;
+      }
+      ev.preventDefault();
+      var clean = String(t).trim().replace(/^\$\s*/, "");
+      var a = input.selectionStart, b = input.selectionEnd;
+      if (a == null) { a = b = input.value.length; }
+      input.value = input.value.slice(0, a) + clean + input.value.slice(b);
+      try { input.setSelectionRange(a + clean.length, a + clean.length); } catch (e) { /* ignore */ }
+      input.dispatchEvent(new Event("input"));
+    });
+    input.addEventListener("input", function () {
+      var before = input.value;
+      var caret = input.selectionStart == null ? before.length : input.selectionStart;
+      // Where the caret sits, counted in characters that survive (digits and
+      // the "."), so a comma appearing ahead of it does not shove it along.
+      var keep = before.slice(0, caret).replace(/[^\d.]/g, "").length;
+      var after = moneyShape(before);
+      if (after === before) return;
+      input.value = after;
+      var pos = 0, seen = 0;
+      while (pos < after.length && seen < keep) {
+        if (/[\d.]/.test(after[pos])) seen++;
+        pos++;
+      }
+      try { input.setSelectionRange(pos, pos); } catch (e) { /* not focused */ }
+    });
+    input.addEventListener("blur", function () {
+      var v = moneyShape(input.value);
+      if (!/\d/.test(v)) { input.value = ""; return; }
+      if (v.indexOf(".") < 0) v += ".00";
+      else if (/\.$/.test(v)) v += "00";
+      input.value = v;
+    });
+  }
+
+  // What the box holds once the ".00" rule has run — Submit can be clicked
+  // straight from the box, before its blur has fired.
+  function finishMoney(input) {
+    if (!input) return "";
+    var v = moneyShape(input.value);
+    if (!/\d/.test(v)) return "";
+    if (v.indexOf(".") < 0) v += ".00";
+    else if (/\.$/.test(v)) v += "00";
+    return v;
+  }
+
+  function isMoney(t) {
+    return /^\d{1,3}(,\d{3})*(\.\d{1,2})?$/.test(String(t || "").trim()) &&
+      /[1-9]/.test(String(t));
+  }
+
+  // The bid date must be a real one within ten years either side of today —
+  // "0026" or "2099" is a slip of the keyboard, and it becomes the date in
+  // the filed bid's name.
+  var DATE_SPAN_YEARS = 10;
+  function dateBounds() {
+    var now = new Date();
+    var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    var mmdd = "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+    return { min: (now.getFullYear() - DATE_SPAN_YEARS) + mmdd,
+             max: (now.getFullYear() + DATE_SPAN_YEARS) + mmdd };
+  }
 
   function renderBidDivisions() {
-    var codes = (project && project.divisions) || [];
+    var codes = ((project && project.divisions) || []).slice().sort(byCode);
     if (!codes.length) return;
     $("bid-amount-single").hidden = true;
     $("bid-divisions-field").hidden = false;
@@ -556,10 +668,11 @@
         '<input type="checkbox" checked data-code="' + safe + '"> ' +
         esc(divisionChip(code)) + "</label>" +
         '<input type="text" inputmode="decimal" class="division-amount" ' +
-        'placeholder="Amount" maxlength="100" data-code="' +
+        'placeholder="e.g. 125000" maxlength="20" data-code="' +
         safe + '">';
       var box = row.querySelector("input[type=checkbox]");
       var amount = row.querySelector(".division-amount");
+      attachMoney(amount);
       box.addEventListener("change", function () {
         amount.disabled = !box.checked;
         row.classList.toggle("off", !box.checked);
@@ -574,7 +687,7 @@
                 bid_date: ($("bid-date").value || "").trim() };
     var rows = document.querySelectorAll("#bid-divisions .division-row");
     if (!rows.length) {
-      out.amount_text = $("bid-amount").value.trim();
+      out.amount_text = finishMoney($("bid-amount"));
       return out;
     }
     rows.forEach(function (row) {
@@ -582,7 +695,7 @@
       if (!box || !box.checked) return;
       var code = box.getAttribute("data-code");
       out.divisions.push(code);
-      var amount = row.querySelector(".division-amount").value.trim();
+      var amount = finishMoney(row.querySelector(".division-amount"));
       if (amount) out.amounts[code] = amount;
     });
     // amount_text mirrors the single amount when exactly one trade is
@@ -599,22 +712,26 @@
   // Returns the message to show, or "" when the answers are complete.
   function bidAnswersProblem(answers) {
     var rows = document.querySelectorAll("#bid-divisions .division-row");
-    var hasDigit = function (t) { return /\d/.test(t || ""); };
     // v1.22.5 round 4 — the bid date is File Bid's fourth question.
     if (!/^\d{4}-\d{2}-\d{2}$/.test(answers.bid_date || "")) {
       return "Enter the date on your bid.";
     }
+    var span = dateBounds();
+    if (answers.bid_date < span.min || answers.bid_date > span.max) {
+      return "Check the date on your bid — it should be within " +
+        DATE_SPAN_YEARS + " years of today.";
+    }
     if (!rows.length) {
-      return hasDigit(answers.amount_text) ? "" :
-        "Enter your bid amount.";
+      return isMoney(answers.amount_text) ? "" :
+        "Enter your bid amount as a number — e.g. 125000.";
     }
     if (!answers.divisions.length) {
       return "Tick at least one trade this bid covers.";
     }
     for (var i = 0; i < answers.divisions.length; i++) {
-      if (!hasDigit(answers.amounts[answers.divisions[i]])) {
+      if (!isMoney(answers.amounts[answers.divisions[i]])) {
         return "Enter an amount for " +
-          divisionChip(answers.divisions[i]) + ".";
+          divisionChip(answers.divisions[i]) + " as a number — e.g. 125000.";
       }
     }
     return "";
@@ -622,8 +739,9 @@
 
   function setFile(file) {
     $("file-error").hidden = true;
-    var isPdf = file && (/\.pdf$/i.test(file.name) ||
-      file.type === "application/pdf");
+    // The name decides: the server refuses any bid whose name does not end
+    // in .pdf, so accepting one here only moved the refusal to Send.
+    var isPdf = file && /\.pdf$/i.test(file.name || "");
     if (!isPdf) {
       $("file-error").textContent = "Bids must be a PDF file.";
       $("file-error").hidden = false;
@@ -710,10 +828,16 @@
       showBidView("bid-success-view");
     }).catch(function (e) {
       showBidView("bid-form-view");
+      var said = String((e && e.message) || "");
       $("submit-error").textContent = e.unauthorized
         ? "This link is no longer active — reply to the invitation email instead."
-        : "Sending failed — check your connection and try again. " +
-          "Your file is still selected.";
+        : /pdf/i.test(said)
+          ? "Bids must be a PDF file — choose the PDF of your bid."
+          : /HTTP 413|too large|payload/i.test(said)
+            ? "That file is too large to send — try re-exporting the PDF " +
+              "at a smaller size."
+            : "Sending failed — check your connection and try again. " +
+              "Your file is still selected.";
       $("submit-error").hidden = false;
     });
   });
@@ -750,6 +874,15 @@
     $("declined-note").hidden = false;
     showBidView("bid-form-view");
   });
+
+  attachMoney($("bid-amount"));
+  // After DATE_SPAN_YEARS is assigned (a `var` is hoisted but empty above it).
+  if ($("bid-date")) {
+    if (!$("bid-date").value) $("bid-date").value = todayIso();
+    var bounds = dateBounds();
+    $("bid-date").min = bounds.min;
+    $("bid-date").max = bounds.max;
+  }
 
   boot();
 })();
