@@ -261,6 +261,9 @@
       project = data || {};
       renderHeader();
       renderBidDivisions();
+      // v1.22.5 round 7 — an open takeoff request opens the page on Submit
+      // Bid, where the banner says what to send.
+      if (renderTakeoff()) showTab("bid");
       $("view-loading").hidden = true;
       $("view-app").hidden = false;
       loadPlans();
@@ -650,6 +653,35 @@
     var mmdd = "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
     return { min: (now.getFullYear() - DATE_SPAN_YEARS) + mmdd,
              max: (now.getFullYear() + DATE_SPAN_YEARS) + mmdd };
+  }
+
+  // v1.22.5 round 7 — the contractor asked for a takeoff and is waiting on
+  // a revised bid. project.takeoff is {items, division, due, requested_at}
+  // or {} (none open). Returns true when the banner is shown.
+  function renderTakeoff() {
+    var t = (project && project.takeoff) || {};
+    var items = Array.isArray(t.items) ? t.items : [];
+    var banner = $("takeoff-banner");
+    if (!banner) return false;
+    if (!items.length) { banner.hidden = true; return false; }
+    $("takeoff-when").textContent = t.requested_at
+      ? "· " + fmtDate(String(t.requested_at).slice(0, 10)) : "";
+    var where = t.division ? divisionChip(t.division) : "";
+    var due = t.due ? "Needed by " + fmtDate(t.due) : "";
+    $("takeoff-where").textContent = [where, due].filter(Boolean).join(" — ");
+    var list = $("takeoff-items");
+    list.innerHTML = "";
+    items.slice(0, 60).forEach(function (it) {
+      var text = [it && it.amount, it && it.desc]
+        .map(function (x) { return String(x || "").trim(); })
+        .filter(Boolean).join(" ");
+      if (!text) return;
+      var li = document.createElement("li");
+      li.textContent = text;
+      list.appendChild(li);
+    });
+    banner.hidden = false;
+    return true;
   }
 
   function renderBidDivisions() {
