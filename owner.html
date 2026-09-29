@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<!-- Automatic Owner Console (v1.21) — Aaron's private support page.
+<!-- Automatic Owner Console — Aaron's private support page.
      Plain HTML/CSS/JS, no build step, no libraries. The owner secret is
      typed into the page (never in the URL) and every request goes to the
      owner-credential-checked owner_* RPCs in Cloud/schema.sql. The page is
-     public but inert: without the secret every call returns unauthorized. -->
+     public but inert: without the secret every call returns unauthorized.
+     v1.22.5 round 14 (app 1.37.9): revamped for support — an Inbox of
+     problem reports (status, reply, private note, screen picture), every
+     computer a company runs, and "Get fresh info now". -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -13,7 +16,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="owner.css">
 </head>
-<body>
+<body class="owner">
 
   <!-- ============================== sign in =============================== -->
   <div id="view-login" class="fullpage" hidden>
@@ -40,52 +43,72 @@
 
   <!-- ================================ app ================================= -->
   <div id="view-app" hidden>
-    <header class="site-header">
-      <div class="header-inner">
-        <p class="gc-line">Automatic — customer support
-          <a href="#" id="sign-out" class="signout">Sign out</a></p>
-        <h1>Owner Console</h1>
-        <p class="meta-line"><span id="stats" class="chips"></span></p>
+    <header class="oc-header">
+      <div class="oc-bar">
+        <div class="oc-brand">Automatic <span class="oc-sub">Owner Console</span></div>
+        <nav class="oc-tabs" aria-label="Sections">
+          <button type="button" class="oc-tab" data-tab="inbox">Inbox
+            <span id="inbox-badge" class="oc-count" hidden></span></button>
+          <button type="button" class="oc-tab" data-tab="companies">Companies
+            <span id="companies-badge" class="oc-count quiet" hidden></span></button>
+        </nav>
+        <div class="oc-right">
+          <span id="stats" class="oc-stats"></span>
+          <button type="button" id="refresh" class="oc-link">↻ Refresh</button>
+          <a href="#" id="sign-out" class="oc-link">Sign out</a>
+        </div>
       </div>
     </header>
 
-    <main class="content">
+    <main class="oc-main">
 
-      <!-- --------------------------- company list ------------------------- -->
-      <section id="pane-list">
-        <!-- v1.22.5 round 13: what people sent with the app's ⚠ button -->
-        <div class="reports-head">
-          <h3 class="section-title">Problem reports
-            <span id="reports-count" class="badge stale" hidden></span></h3>
-          <label class="reports-toggle"><input id="reports-show-done"
-                 type="checkbox"> Show done</label>
+      <!-- ------------------------------ inbox ----------------------------- -->
+      <section id="tab-inbox" hidden>
+        <div class="oc-toolbar">
+          <div class="seg" id="inbox-filter" role="group" aria-label="Show">
+            <button type="button" data-f="open" class="on">Open</button>
+            <button type="button" data-f="new">New</button>
+            <button type="button" data-f="working">Working on it</button>
+            <button type="button" data-f="done">Done</button>
+            <button type="button" data-f="all">All</button>
+          </div>
+          <input id="inbox-search" class="oc-search" type="search"
+                 placeholder="Search company, person or text…" autocomplete="off">
         </div>
-        <div id="reports-list"></div>
-        <p id="reports-empty" class="empty" hidden>
-          No open problem reports. When someone presses ⚠ in the app, what
-          they wrote shows up here.
-        </p>
+        <div class="split" id="inbox-split">
+          <div id="inbox-list" class="rep-list"></div>
+          <div id="inbox-detail" class="rep-detail"></div>
+        </div>
+        <p id="inbox-empty" class="empty-card" hidden></p>
+      </section>
 
-        <h3 class="section-title">Companies</h3>
-        <div class="listbar">
-          <input id="search" type="search" placeholder="Search companies…"
-                 autocomplete="off">
+      <!-- ---------------------------- companies --------------------------- -->
+      <section id="tab-companies" hidden>
+        <div class="oc-toolbar">
+          <input id="search" class="oc-search" type="search"
+                 placeholder="Search companies…" autocomplete="off">
           <button id="add-company" class="btn btn-primary" type="button">+ Company</button>
-          <button id="refresh" class="btn btn-outline" type="button">Refresh</button>
         </div>
-        <div id="company-list"></div>
-        <p id="list-empty" class="empty" hidden>
+        <div class="co-table" id="co-table">
+          <div class="co-head" aria-hidden="true">
+            <span>Company</span><span>Reports</span><span>Computers</span>
+            <span>Versions</span><span>Last seen</span><span>Plan</span>
+          </div>
+          <div id="company-list"></div>
+        </div>
+        <p id="list-empty" class="empty-card" hidden>
           No companies have registered yet. The first launch of Automatic
           with cloud on creates a row here by itself.
         </p>
       </section>
 
-      <!-- -------------------------- company detail ------------------------ -->
-      <section id="pane-detail" hidden>
-        <p class="backline"><a href="#" id="back-link">&larr; All companies</a></p>
+      <!-- ----------------------------- company ---------------------------- -->
+      <section id="tab-company" hidden>
+        <p class="crumb"><a href="#" id="back-link">Companies</a>
+          <span aria-hidden="true">›</span> <span id="crumb-name"></span></p>
 
-        <div class="detail-card">
-          <div class="detail-head">
+        <div class="co-card">
+          <div class="co-card-head">
             <div>
               <h2 id="d-name"></h2>
               <p class="d-meta">
@@ -96,39 +119,65 @@
             </div>
             <span id="d-paid" class="badge"></span>
           </div>
-          <div class="detail-actions">
+          <div class="co-actions">
+            <button id="btn-fresh" class="btn btn-primary" type="button">Get fresh info now</button>
             <button id="btn-paid" class="btn btn-outline" type="button"></button>
             <button id="btn-note" class="btn btn-outline" type="button">Edit note</button>
             <button id="btn-delete" class="btn btn-danger" type="button">Delete company…</button>
           </div>
+          <p id="fresh-status" class="fresh-status" hidden></p>
           <p id="d-note" class="owner-note" hidden></p>
-          <p class="hint">Paid changes are picked up by their app on its next
-            daily license check (up to ~24&nbsp;h, plus a 30-day offline grace
-            window).</p>
         </div>
 
-        <h3 class="section-title">Problem reports</h3>
-        <div id="d-reports"></div>
-        <p id="d-reports-empty" class="empty" hidden>
-          Nobody at this company has sent a problem report.
-        </p>
+        <nav class="sub-tabs" id="co-tabs" aria-label="Company">
+          <button type="button" data-sub="overview" class="on">Overview</button>
+          <button type="button" data-sub="reports">Reports <span id="n-reports" class="sub-n"></span></button>
+          <button type="button" data-sub="computers">Computers <span id="n-computers" class="sub-n"></span></button>
+          <button type="button" data-sub="diag">Diagnostics</button>
+          <button type="button" data-sub="projects">Projects <span id="n-projects" class="sub-n"></span></button>
+          <button type="button" data-sub="activity">Activity</button>
+        </nav>
 
-        <h3 class="section-title">Shared projects</h3>
-        <div id="d-projects"></div>
-        <p id="d-projects-empty" class="empty" hidden>
-          This company hasn't shared any projects to the cloud yet.
-        </p>
+        <div id="co-overview" class="sub-pane"></div>
 
-        <h3 class="section-title">Settings &amp; diagnostics</h3>
-        <p id="d-diag-empty" class="empty" hidden>
-          No diagnostics uploaded yet. Snapshots arrive once the company runs a
-          v1.21+ build with cloud on (pushed on their next daily sync).
-        </p>
-        <div id="d-diag"></div>
+        <div id="co-reports" class="sub-pane" hidden>
+          <div class="split">
+            <div id="d-reports" class="rep-list"></div>
+            <div id="d-report-detail" class="rep-detail"></div>
+          </div>
+          <p id="d-reports-empty" class="empty-card" hidden>
+            Nobody at this company has sent a problem report.
+          </p>
+        </div>
 
-        <h3 class="section-title">Activity</h3>
-        <div id="d-activity" class="timeline"></div>
-        <p id="d-activity-empty" class="empty" hidden>No activity recorded yet.</p>
+        <div id="co-computers" class="sub-pane" hidden>
+          <div id="d-computers"></div>
+          <p id="d-computers-empty" class="empty-card" hidden>
+            No computers have checked in yet. Each computer running app
+            1.37.9 or later with cloud on appears here within a minute of
+            opening Automatic.
+          </p>
+        </div>
+
+        <div id="co-diag" class="sub-pane" hidden>
+          <div id="d-diag"></div>
+          <p id="d-diag-empty" class="empty-card" hidden>
+            No diagnostics uploaded yet. Press <strong>Get fresh info now</strong>
+            — their app sends a snapshot on its next pass while it's open.
+          </p>
+        </div>
+
+        <div id="co-projects" class="sub-pane" hidden>
+          <div id="d-projects"></div>
+          <p id="d-projects-empty" class="empty-card" hidden>
+            This company hasn't shared any projects to the cloud yet.
+          </p>
+        </div>
+
+        <div id="co-activity" class="sub-pane" hidden>
+          <div id="d-activity" class="timeline"></div>
+          <p id="d-activity-empty" class="empty-card" hidden>No activity recorded yet.</p>
+        </div>
       </section>
     </main>
 
@@ -154,9 +203,10 @@
     <form id="delete-form" class="modal">
       <h2>Delete this company?</h2>
       <p>Removes the company and all of its cloud data (projects, invites,
-         plan records, bids, chat). Their app re-registers fresh on next
-         launch. Built for cleaning up test registrations — type the Company
-         ID <strong id="delete-fnd" class="mono"></strong> to confirm.</p>
+         plan records, bids, chat, problem reports, computers). Their app
+         re-registers fresh on next launch. Built for cleaning up test
+         registrations — type the Company ID
+         <strong id="delete-fnd" class="mono"></strong> to confirm.</p>
       <input id="delete-confirm" type="text" autocomplete="off"
              placeholder="Type the Company ID" maxlength="100">
       <button type="submit" class="btn btn-danger" disabled>Delete permanently</button>
@@ -175,7 +225,7 @@
          signs in as this company.</p>
       <label class="field"><span>Company ID</span>
         <input id="create-fnd" type="text" autocomplete="off"
-               placeholder="e.g. FND-1A2B-3C4D" maxlength="100"></label>
+               placeholder="e.g. AUTO-1A2B-3C4D" maxlength="100"></label>
       <label class="field"><span>Company name <em>(optional)</em></span>
         <input id="create-name" type="text" autocomplete="off" maxlength="200"></label>
       <label class="remember-line">
@@ -197,6 +247,14 @@
       <p class="cred-line">Secret<br><span id="secret-val" class="mono cred"></span></p>
       <button type="button" id="secret-copy" class="btn btn-outline">Copy both</button>
       <button type="button" id="secret-done" class="btn btn-primary">Done</button>
+    </div>
+  </div>
+
+  <!-- a report's screen picture, full size -->
+  <div id="shot-modal" class="modal-backdrop shot-backdrop" hidden>
+    <div class="shot-box">
+      <img id="shot-img" alt="The app window when the report was sent">
+      <button type="button" id="shot-close" class="btn btn-primary">Close</button>
     </div>
   </div>
 
