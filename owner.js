@@ -16,6 +16,7 @@
 
   var secret = "";
   var companies = [];        // owner_list_companies payload
+  var reports = [];          // owner_list_reports payload (the list pane)
   var current = null;        // company object open in the detail pane
 
   var KIND_LABELS = {
@@ -231,6 +232,102 @@
     });
   }
 
+  // ------------------------------------------------------ problem reports
+  // v1.22.5 round 13 — what people sent with the app's ⚠ button: where in
+  // the app, what happened, who, which version and computer, and the app's
+  // recent error messages. Open ones first; Mark done files one away.
+
+  function reportCard(r, showCompany, onChange) {
+    var card = document.createElement("div");
+    card.className = "report-card" + (r.status === "done" ? " done" : "");
+    var when = fmtDateTime(r.reported_at || r.created_at);
+    var errs = Array.isArray(r.errors) ? r.errors : [];
+    var head = [];
+    if (showCompany) {
+      head.push('<a href="#" class="report-company">' +
+                esc(r.company_name || r.fnd_company_id || "(company)") + "</a>");
+    }
+    if (r.reporter) head.push(esc(r.reporter));
+    head.push(esc(when));
+    card.innerHTML =
+      '<div class="report-top">' +
+      '<p class="report-head">' + head.join(" · ") + "</p>" +
+      '<button type="button" class="btn btn-outline report-btn">' +
+      (r.status === "done" ? "Reopen" : "Mark done") + "</button></div>" +
+      '<p class="report-where"><span class="report-label">Where:</span> ' +
+      esc(r.area || "—") + "</p>" +
+      '<p class="report-what">' + esc(r.what || "") + "</p>" +
+      '<p class="report-meta">' +
+      [r.app_version ? "v" + esc(r.app_version) : "",
+       esc(r.machine || ""),
+       r.status === "done" && r.done_at ? "done " + esc(fmtDate(r.done_at)) : ""]
+        .filter(Boolean).join(" · ") + "</p>" +
+      (errs.length
+        ? group("Recent errors from the app", String(errs.length),
+                renderErrors(errs), false)
+        : "");
+    var link = card.querySelector(".report-company");
+    if (link) {
+      link.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        var c = companies.filter(function (x) { return x.id === r.company_id; })[0];
+        if (c) openDetail(c);
+      });
+    }
+    var btn = card.querySelector(".report-btn");
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      ownerRpc("owner_set_report_status", {
+        p_report_id: r.id, p_status: r.status === "done" ? "new" : "done"
+      }).then(onChange).catch(function (e) {
+        btn.disabled = false;
+        if (e.unauthorized) { signOut(); return; }
+        alert("Couldn't update that report — check your connection and try again.");
+      });
+    });
+    return card;
+  }
+
+  function renderReports(list, boxId, emptyId, showCompany, onChange) {
+    var box = $(boxId);
+    box.innerHTML = "";
+    $(emptyId).hidden = list.length > 0;
+    list.forEach(function (r) {
+      box.appendChild(reportCard(r, showCompany, onChange));
+    });
+  }
+
+  function loadReports() {
+    var showDone = $("reports-show-done").checked;
+    return ownerRpc("owner_list_reports", {
+      p_status: showDone ? null : "new", p_company_id: null, p_limit: 200
+    }).then(function (data) {
+      reports = Array.isArray(data) ? data : [];
+      var open = reports.filter(function (r) { return r.status === "new"; }).length;
+      $("reports-count").textContent = open + " new";
+      $("reports-count").hidden = open === 0;
+      renderReports(reports, "reports-list", "reports-empty", true, loadReports);
+    }).catch(function (e) {
+      if (e.unauthorized) { signOut(); return; }
+      $("reports-list").innerHTML =
+        '<p class="empty">Couldn\'t load problem reports.</p>';
+    });
+  }
+
+  function loadCompanyReports(c) {
+    $("d-reports").innerHTML = "";
+    $("d-reports-empty").hidden = true;
+    return ownerRpc("owner_list_reports", {
+      p_status: null, p_company_id: c.id, p_limit: 100
+    }).then(function (data) {
+      renderReports(Array.isArray(data) ? data : [], "d-reports",
+                    "d-reports-empty", false, function () {
+                      loadCompanyReports(c);
+                      loadReports();
+                    });
+    }).catch(handleDetailError);
+  }
+
   function refreshList(showSpinner) {
     if (showSpinner) show("view-loading");
     return ownerRpc("owner_list_companies").then(function (data) {
@@ -238,6 +335,7 @@
       renderStats();
       renderList();
       show("view-app");
+      loadReports();
     }).catch(function (e) {
       if (e.unauthorized) {
         signOut();
@@ -281,6 +379,8 @@
       .then(function (events) {
         renderActivity(Array.isArray(events) ? events : []);
       }).catch(handleDetailError);
+
+    loadCompanyReports(c);
 
     $("d-diag").innerHTML = "";
     $("d-diag-empty").hidden = true;
@@ -651,6 +751,7 @@
     backToList(false);
   });
   $("search").addEventListener("input", renderList);
+  $("reports-show-done").addEventListener("change", loadReports);
   $("refresh").addEventListener("click", function () {
     refreshList(false).then(function () {
       // if the open company vanished server-side, the list is authoritative

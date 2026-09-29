@@ -237,3 +237,22 @@
 }
 .modal .btn { width: auto; margin-right: 8px; }
 .modal .field-error { margin-top: 10px; }
+
+/* ---- problem reports (v1.22.5 round 13) ---- */
+.reports-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.reports-toggle { font-size: 13px; color: var(--muted, #6b6b6b); white-space: nowrap; }
+.report-card {
+  background: #fff; border: 1px solid var(--border, #e5e5e5);
+  border-left: 4px solid var(--amber, #854f0b);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+}
+.report-card.done { border-left-color: var(--border, #e5e5e5); opacity: 0.75; }
+.report-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.report-head { margin: 0; font-size: 13px; color: var(--muted, #6b6b6b); }
+.report-company { font-weight: 600; }
+.report-btn { flex: none; }
+.report-where { margin: 6px 0 4px; font-size: 14px; }
+.report-label { color: var(--muted, #6b6b6b); }
+.report-what { margin: 0 0 6px; font-size: 15px; white-space: pre-wrap; word-break: break-word; }
+.report-meta { margin: 0; font-size: 12px; color: var(--muted, #6b6b6b); }
+.report-card .diag-group { margin-top: 8px; }
