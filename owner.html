@@ -53,6 +53,20 @@
 
       <!-- --------------------------- company list ------------------------- -->
       <section id="pane-list">
+        <!-- v1.22.5 round 13: what people sent with the app's ⚠ button -->
+        <div class="reports-head">
+          <h3 class="section-title">Problem reports
+            <span id="reports-count" class="badge stale" hidden></span></h3>
+          <label class="reports-toggle"><input id="reports-show-done"
+                 type="checkbox"> Show done</label>
+        </div>
+        <div id="reports-list"></div>
+        <p id="reports-empty" class="empty" hidden>
+          No open problem reports. When someone presses ⚠ in the app, what
+          they wrote shows up here.
+        </p>
+
+        <h3 class="section-title">Companies</h3>
         <div class="listbar">
           <input id="search" type="search" placeholder="Search companies…"
                  autocomplete="off">
@@ -92,6 +106,12 @@
             daily license check (up to ~24&nbsp;h, plus a 30-day offline grace
             window).</p>
         </div>
+
+        <h3 class="section-title">Problem reports</h3>
+        <div id="d-reports"></div>
+        <p id="d-reports-empty" class="empty" hidden>
+          Nobody at this company has sent a problem report.
+        </p>
 
         <h3 class="section-title">Shared projects</h3>
         <div id="d-projects"></div>
