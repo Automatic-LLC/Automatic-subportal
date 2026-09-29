@@ -85,6 +85,15 @@
       <section id="pane-bid" class="pane" role="tabpanel" hidden>
 
         <div id="bid-form-view">
+          <!-- v1.22.5 round 7 — an open takeoff request from the contractor.
+               Filled by renderTakeoff(); stays hidden when there is none. -->
+          <div id="takeoff-banner" class="takeoff-banner" hidden>
+            <p class="takeoff-title"><strong>Takeoff requested</strong>
+              <span id="takeoff-when"></span></p>
+            <p id="takeoff-where" class="takeoff-where"></p>
+            <ul id="takeoff-items" class="takeoff-items"></ul>
+            <p class="takeoff-ask">Please send your revised bid below.</p>
+          </div>
           <div id="declined-note" class="banner-warn" hidden>
             You marked this project as "not bidding". Changed your mind?
             You can still submit a bid below.
@@ -107,6 +116,8 @@
             <span>This bid covers <em>(from your invitation — adjust if
               needed)</em>, with an amount for each</span>
             <div id="bid-divisions" class="division-list"></div>
+            <p class="field-hint">Amounts are numbers only — e.g. 125000.
+              Commas and cents are added for you.</p>
           </div>
           <label class="field">
             <span>Date on your bid</span>
@@ -116,7 +127,9 @@
             <label class="field" id="bid-amount-single">
               <span>Bid amount</span>
               <input id="bid-amount" type="text" inputmode="decimal"
-                     placeholder="e.g. 148,500" maxlength="100">
+                     placeholder="e.g. 125000" maxlength="20">
+              <p class="field-hint">Numbers only — e.g. 125000. Commas and
+                cents are added for you.</p>
             </label>
           </div>
           <label class="field">
