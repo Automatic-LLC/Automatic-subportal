@@ -121,9 +121,15 @@
   // ------------------------------------------------------------ formatting
 
   function esc(s) {
+    // Quotes too (app 1.38.7), the same as app.js. textContent->innerHTML
+    // escapes < > & only, and this page puts escaped values inside
+    // attributes (title="…"). Every value here comes from a company's own
+    // app, and anyone can register a company, so an unescaped quote let a
+    // stranger's text close the attribute and add a script to the one page
+    // that holds the owner secret.
     var d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
-    return d.innerHTML;
+    return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   function parseTs(iso) {
@@ -987,7 +993,9 @@
     }
     $("d-diag-empty").hidden = true;
     var parts = [];
-    var sub = snap.contractor_type ? (" · " + snap.contractor_type) : "";
+    // Escaped (app 1.38.7): it was the one snapshot field that reached
+    // innerHTML raw, and a company writes its own snapshot.
+    var sub = snap.contractor_type ? (" · " + esc(snap.contractor_type)) : "";
     parts.push('<p class="diag-updated">Snapshot from <span class="mono">' +
       esc(data.machine || snap.machine || "?") + "</span> · " +
       esc(fmtDateTime(data.updated_at)) + " (" + esc(fmtAgo(data.updated_at)) + ")" +
