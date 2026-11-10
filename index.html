@@ -48,7 +48,7 @@
 
     <nav class="tabbar" role="tablist">
       <button id="tab-plans" class="tab active" role="tab" aria-selected="true">Plans</button>
-      <button id="tab-messages" class="tab" role="tab" aria-selected="false">Messages</button>
+      <button id="tab-messages" class="tab" role="tab" aria-selected="false">Job Board<span id="board-new-count" class="tab-count" hidden></span></button>
       <button id="tab-bid" class="tab" role="tab" aria-selected="false">Submit Bid</button>
     </nav>
 
@@ -62,23 +62,36 @@
         </div>
         <div id="plans-list"></div>
         <p id="plans-empty" class="empty" hidden>
-          No plans have been shared yet. Check back soon, or message the
-          contractor on the Messages tab.
+          No plans have been shared yet. Check back soon, or look for
+          updates on the Job Board tab.
         </p>
       </section>
 
-      <!-- ---------------------------- Messages --------------------------- -->
+      <!-- ---------------------------- Job Board -------------------------- -->
       <section id="pane-messages" class="pane" role="tabpanel" hidden>
-        <div id="msg-thread" class="thread"></div>
-        <p id="msg-empty" class="empty" hidden>
-          No messages yet. Say hello — the contractor sees these in
-          the project's chat.
+        <p id="board-empty" class="empty" hidden>
+          Nothing posted yet. Your contractor will post updates here.
         </p>
-        <form id="msg-form" class="composer">
-          <input id="msg-input" type="text" autocomplete="off"
-                 placeholder="Type a message…" maxlength="4000">
-          <button type="submit" class="btn btn-primary">Send</button>
-        </form>
+        <p id="board-error" class="empty" hidden>
+          Couldn't load the Job Board &mdash; check your connection.
+        </p>
+        <div id="board-layout" class="board-layout" hidden>
+          <div class="board-main">
+            <section id="board-pinned-wrap" aria-labelledby="board-pinned-h" hidden>
+              <h2 id="board-pinned-h" class="board-h">Pinned</h2>
+              <div id="board-pinned" class="board-grid"></div>
+            </section>
+            <section id="board-rest-wrap" aria-labelledby="board-rest-h">
+              <h2 id="board-rest-h" class="board-h">Posts</h2>
+              <div id="board-rest" class="board-grid"></div>
+            </section>
+          </div>
+          <aside class="board-files" aria-labelledby="board-files-h">
+            <h2 id="board-files-h" class="board-h">Files</h2>
+            <p id="board-files-empty" class="plan-meta" hidden>No files attached yet.</p>
+            <div id="board-files"></div>
+          </aside>
+        </div>
       </section>
 
       <!-- --------------------------- Submit Bid -------------------------- -->
@@ -182,17 +195,6 @@
       <p>Powered by <strong>Automatic</strong> —
          <a href="#" id="get-app-link">get the free app</a></p>
     </footer>
-  </div>
-
-  <!-- name popup (first message send) -->
-  <div id="name-modal" class="modal-backdrop" hidden>
-    <form id="name-form" class="modal">
-      <h2>Your name</h2>
-      <p>Shown next to your messages so the contractor knows who's writing.</p>
-      <input id="name-input" type="text" maxlength="200" autocomplete="name"
-             placeholder="e.g. Sam at Acme Drywall">
-      <button type="submit" class="btn btn-primary">Save</button>
-    </form>
   </div>
 
   <script src="config.js"></script>

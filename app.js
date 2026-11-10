@@ -68,7 +68,7 @@
   var token = (location.hash || "").replace(/^#/, "").trim();
   var project = null;          // sub_get_project payload
   var chosenFile = null;       // File selected for Submit Bid
-  var msgTimer = null;         // 45s refresh while Messages tab is open
+  var msgTimer = null;         // 60s refresh while the Job Board tab is open
 
   function $(id) { return document.getElementById(id); }
 
@@ -268,6 +268,7 @@
       $("view-app").hidden = false;
       loadPlans();
       startPlansRefresh();
+      if (currentTab !== "messages") loadBoard();   // for the New count
     }).catch(function (e) {
       if (e.unauthorized) {
         showError();
@@ -317,14 +318,20 @@
       $(tabs[k]).setAttribute("aria-selected", active ? "true" : "false");
       $(panes[k]).hidden = !active;
     });
+    currentTab = which;
+    if (boardPosts.length) updateNewCount();
+    document.body.classList.toggle("board-open", which === "messages");
     if (which === "messages") {
-      loadMessages();
-      if (!msgTimer) msgTimer = setInterval(loadMessages, 45000);
+      loadBoard();
+      if (!msgTimer) msgTimer = setInterval(function () {
+        if (!document.hidden) loadBoard();
+      }, 60000);
     } else if (msgTimer) {
       clearInterval(msgTimer);
       msgTimer = null;
     }
   }
+  var currentTab = "plans";
 
   $("tab-plans").addEventListener("click", function () { showTab("plans"); });
   $("tab-messages").addEventListener("click", function () { showTab("messages"); });
@@ -395,6 +402,7 @@
   }
 
   document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && currentTab === "messages") loadBoard();
     if (!document.hidden && plansLoadedAt &&
         Date.now() - plansLoadedAt > 30 * 1000) {
       loadPlans();
@@ -478,65 +486,190 @@
     });
   }
 
-  // ------------------------------------------------------------- messages
+  // ------------------------------------------------------------ job board
 
-  function loadMessages() {
-    rpc("sub_list_messages", { p_token: token }).then(function (msgs) {
-      msgs = Array.isArray(msgs) ? msgs : [];
-      var thread = $("msg-thread");
-      var nearBottom = thread.scrollHeight - thread.scrollTop -
-        thread.clientHeight < 80;
-      thread.innerHTML = "";
-      $("msg-empty").hidden = msgs.length > 0;
-      msgs.forEach(function (m) {
-        var div = document.createElement("div");
-        div.className = "bubble " + (m.sender_type === "gc" ? "gc" : "sub");
-        div.innerHTML =
-          '<span class="who">' + esc(m.sender_name ||
-            (m.sender_type === "gc" ? "Contractor" : "You")) + "</span>" +
-          esc(m.body) +
-          '<span class="when">' + esc(fmtDateTime(m.created_at)) + "</span>";
-        thread.appendChild(div);
+  // Read-only bulletin board the contractor posts to (sub_list_board).
+  // Subs cannot post. Files come with a 15-minute read grant, so — like
+  // plans — the list is re-fetched before an open when it is old.
+  var BOARD_STALE_MS = 10 * 60 * 1000;
+  var boardPosts = [];
+  var boardLoadedAt = 0;
+  var boardFirstRender = true;
+  var boardSeenAt = null;      // last-viewed time read once per page load
+
+  // Short non-reversible hash so the token itself is never stored.
+  function tokenHash() {
+    var h = 2166136261;
+    for (var i = 0; i < token.length; i++) {
+      h ^= token.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h.toString(36);
+  }
+  function boardSeenKey() { return "auto:board:" + tokenHash(); }
+  function readSeen() {
+    try {
+      var v = localStorage.getItem(boardSeenKey());
+      var n = v ? parseInt(v, 10) : 0;
+      return isNaN(n) ? 0 : n;
+    } catch (e) { return 0; }
+  }
+  function writeSeen(ms) {
+    try { localStorage.setItem(boardSeenKey(), String(ms)); } catch (e) { /* blocked */ }
+  }
+
+  function postTime(p) {
+    var d = parseTs(p.posted_at);
+    return d ? d.getTime() : 0;
+  }
+
+  function fmtBoardTime(iso) {
+    var d = parseTs(iso);
+    if (!d) return "";
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+      ", " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
+  function isNew(p) { return postTime(p) > boardSeenAt; }
+
+  function updateNewCount() {
+    var n = currentTab === "messages" ? 0 : boardPosts.filter(isNew).length;
+    var el = $("board-new-count");
+    el.textContent = n ? String(n) : "";
+    el.hidden = !n;
+    el.setAttribute("aria-label", n + " new");
+  }
+
+  function postCard(p, pinned) {
+    var card = document.createElement("article");
+    card.className = "post-card" + (pinned ? " pinned" : "");
+    var who = [p.author_name, p.author_company].filter(Boolean).join(" · ");
+    var when = fmtBoardTime(p.posted_at) + (p.edited_at ? " · edited" : "");
+    card.innerHTML =
+      '<div class="post-top">' +
+        (p.tag ? '<span class="tag-pill">' + esc(p.tag) + "</span>" : "") +
+        (isNew(p) ? '<span class="new-badge">New</span>' : "") +
+      "</div>" +
+      '<h3 class="post-title">' + esc(p.title) + "</h3>" +
+      (p.body ? '<p class="post-body">' + esc(p.body) + "</p>" : "") +
+      '<p class="post-meta">' + (who ? esc(who) + "<br>" : "") + esc(when) + "</p>";
+    return card;
+  }
+
+  function renderBoard(posts) {
+    boardPosts = posts;
+    // Counts and badges are judged against the time of the PREVIOUS view;
+    // the stored time moves up only after what is on screen was drawn.
+    if (boardFirstRender) { boardSeenAt = readSeen(); }
+    var pinned = posts.filter(function (p) { return p.pinned; });
+    var rest = posts.filter(function (p) { return !p.pinned; });
+    $("board-empty").hidden = posts.length > 0;
+    $("board-error").hidden = true;
+    $("board-layout").hidden = posts.length === 0;
+    $("board-pinned-wrap").hidden = pinned.length === 0;
+    $("board-rest-wrap").hidden = rest.length === 0;
+    $("board-rest-h").hidden = pinned.length === 0;   // no "Posts" heading alone
+    var gp = $("board-pinned"), gr = $("board-rest");
+    gp.innerHTML = ""; gr.innerHTML = "";
+    pinned.forEach(function (p) { gp.appendChild(postCard(p, true)); });
+    rest.forEach(function (p) { gr.appendChild(postCard(p, false)); });
+
+    var files = [];
+    posts.forEach(function (p) {
+      (p.files || []).forEach(function (f) {
+        files.push({ f: f, t: postTime(p) });
       });
-      if (nearBottom || !thread.dataset.scrolled) {
-        thread.scrollTop = thread.scrollHeight;
-        window.scrollTo(0, document.body.scrollHeight);
-        thread.dataset.scrolled = "1";
-      }
-    }).catch(function () { /* quiet — next refresh retries */ });
-  }
-
-  function ensureName() {
-    var name = storeGet("name");
-    if (name) return Promise.resolve(name);
-    return new Promise(function (resolve) {
-      $("name-modal").hidden = false;
-      $("name-input").focus();
-      $("name-form").onsubmit = function (ev) {
-        ev.preventDefault();
-        var v = $("name-input").value.trim() ||
-          (project && project.sub_company_name) || "";
-        storeSet("name", v);
-        $("name-modal").hidden = true;
-        resolve(v);
-      };
     });
+    files.sort(function (a, b) { return b.t - a.t; });
+    var fl = $("board-files");
+    fl.innerHTML = "";
+    $("board-files-empty").hidden = files.length > 0;
+    files.forEach(function (x) {
+      var f = x.f;
+      var meta = [fmtSize(f.size_bytes), x.t ? fmtBoardTime(new Date(x.t).toISOString()) : ""]
+        .filter(Boolean).join(" · ");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "file-row";
+      btn.innerHTML = '<span class="plan-name">' + esc(f.filename) + "</span>" +
+        '<span class="plan-meta">' + esc(meta) + "</span>";
+      btn.addEventListener("click", function () { openBoardFile(f, btn); });
+      fl.appendChild(btn);
+    });
+
+    updateNewCount();
+    boardFirstRender = false;
+    // Stamp the view only after the badges were drawn. Later refreshes in
+    // the same visit keep the badges (boardSeenAt is not moved) so a post
+    // does not lose its "New" while the sub is still looking at it.
+    if (currentTab === "messages") writeSeen(Date.now());
   }
 
-  $("msg-form").addEventListener("submit", function (ev) {
-    ev.preventDefault();
-    var body = $("msg-input").value.trim();
-    if (!body) return;
-    ensureName().then(function (name) {
-      return rpc("sub_post_message",
-        { p_token: token, p_sender_name: name, p_body: body });
-    }).then(function () {
-      $("msg-input").value = "";
-      loadMessages();
+  function loadBoard() {
+    return rpc("sub_list_board", { p_token: token }).then(function (res) {
+      var posts = (res && Array.isArray(res.posts)) ? res.posts : [];
+      boardLoadedAt = Date.now();
+      renderBoard(posts);
+      return posts;
     }).catch(function () {
-      alert("Couldn't send — check your connection and try again.");
+      if (!boardPosts.length) {
+        $("board-error").hidden = false;
+        $("board-empty").hidden = true;
+      }
+      return null;
     });
-  });
+  }
+
+  function currentBoardFile(f, posts) {
+    var found = null;
+    (posts || []).forEach(function (p) {
+      (p.files || []).forEach(function (q) {
+        if (!found && q.file_id === f.file_id) found = q;
+      });
+    });
+    return found;
+  }
+
+  function openBoardFile(f, btn) {
+    btn.disabled = true;
+    var gone = false;
+    var win = null;
+    // Open the tab inside the click so a popup blocker allows it.
+    try { win = window.open("", "_blank"); } catch (e) { win = null; }
+    var fresh = (Date.now() - boardLoadedAt < BOARD_STALE_MS)
+      ? Promise.resolve(f)
+      : loadBoard().then(function (posts) {
+          return posts ? currentBoardFile(f, posts) : f;
+        });
+    fresh.then(function (row) {
+      if (!row) { gone = true; throw new Error("gone"); }
+      return fetchFile(row.bucket || "board", row.path).catch(function () {
+        return loadBoard().then(function (posts) {
+          var again = posts ? currentBoardFile(f, posts) : null;
+          if (!again) { gone = true; throw new Error("gone"); }
+          return fetchFile(again.bucket || "board", again.path);
+        });
+      });
+    }).then(function (blob) {
+      var url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+      if (win && !win.closed) {
+        win.location.href = url;
+      } else {
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = f.filename || "file.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    }).catch(function () {
+      if (win && !win.closed) win.close();
+      alert(gone
+        ? "That file is no longer posted — the Job Board has been updated."
+        : "Couldn't open that file — check your connection and try again.");
+    }).finally(function () { btn.disabled = false; });
+  }
 
   // ------------------------------------------------------------ submit bid
 
